@@ -47,9 +47,18 @@ const navegacaoAreas = [
 const navegacaoManejos = [{ rotulo: "Manejos Sanitários", href: "/manejos/sanitarios" }];
 
 // Reprodução — começa pela Estação Reprodutiva (período de monta/cobertura
-// de cada espécie), outras rotinas (coberturas, diagnósticos, nascimentos)
-// entram aqui conforme forem construídas.
-const navegacaoReproducao = [{ rotulo: "Estação Reprodutiva", href: "/reproducao/estacoes" }];
+// de cada espécie), Animais Externos (touros de sêmen, doadoras, ancestrais
+// comprados), Banco Genético (sêmen e embriões), Lotes RM (touros soltos em
+// monta natural) e Eventos Reprodutivos (rodadas de cobertura dentro da
+// estação ativa); coberturas, diagnósticos e nascimentos entram aqui
+// conforme forem construídos.
+const navegacaoReproducao = [
+  { rotulo: "Estação Reprodutiva", href: "/reproducao/estacoes" },
+  { rotulo: "Eventos Reprodutivos", href: "/reproducao/eventos" },
+  { rotulo: "Animais Externos", href: "/reproducao/externos" },
+  { rotulo: "Banco Genético", href: "/reproducao/banco-genetico" },
+  { rotulo: "Lotes RM", href: "/reproducao/lotes-rm" },
+];
 
 // Cadastros de apoio e administração do local — usados com pouca frequência
 // (bem menos que Animais/Ocorrências), por isso ficam agrupados fora da

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import type { ResumoExclusaoReprodutiva } from "../../app/[localId]/reproducao/_componentes/dialogo-apagar-reprodutivo";
 
 export type EstadoEstacao = { erro?: string } | undefined;
 
@@ -52,6 +53,13 @@ export async function salvarEstacaoReprodutiva(
   if (error) return { erro: "Não foi possível abrir a estação: " + error.message };
   revalidatePath(caminho(localId));
   return {};
+}
+
+export async function buscarResumoEstacaoParaExclusao(estacaoId: string): Promise<ResumoExclusaoReprodutiva> {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("resumo_estacao_para_exclusao", { p_estacao_id: estacaoId });
+  if (error) throw new Error(error.message);
+  return data as ResumoExclusaoReprodutiva;
 }
 
 export async function apagarEstacaoReprodutiva(localId: string, id: string) {

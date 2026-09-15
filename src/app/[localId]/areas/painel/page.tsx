@@ -46,6 +46,8 @@ export type ManejoResumo = {
   especie: Especie;
   area_id: string;
   descricao: string | null;
+  responsavel: string | null;
+  medicamentos: string[];
   quantidade: number;
 };
 
@@ -119,7 +121,7 @@ export default async function PainelAreasPage({
       .limit(500),
     supabase
       .from("manejos_sanitarios")
-      .select("id, data, especie, area_id, descricao")
+      .select("id, data, especie, area_id, descricao, responsavel")
       .eq("local_id", localId)
       .order("criado_em", { ascending: false })
       .limit(500),
@@ -133,12 +135,27 @@ export default async function PainelAreasPage({
   }
 
   const idsManejos = (manejosRaw ?? []).map((m) => m.id);
-  const { data: manejosAnimaisRaw, error: erroManejosAnimais } = idsManejos.length
-    ? await supabase.from("manejos_sanitarios_animais").select("manejo_id").in("manejo_id", idsManejos)
-    : { data: [] as { manejo_id: string }[], error: null };
+  const [
+    { data: manejosAnimaisRaw, error: erroManejosAnimais },
+    { data: manejosMedicamentosRaw, error: erroManejosMedicamentos },
+  ] = idsManejos.length
+    ? await Promise.all([
+        supabase.from("manejos_sanitarios_animais").select("manejo_id").in("manejo_id", idsManejos),
+        supabase
+          .from("manejos_sanitarios_medicamentos")
+          .select("manejo_id, medicamentos(descricao)")
+          .in("manejo_id", idsManejos),
+      ])
+    : [
+        { data: [] as { manejo_id: string }[], error: null },
+        { data: [] as { manejo_id: string; medicamentos: unknown }[], error: null },
+      ];
 
-  if (erroManejosAnimais) {
-    throw new Error("Não foi possível carregar o painel de áreas: " + erroManejosAnimais.message);
+  if (erroManejosAnimais || erroManejosMedicamentos) {
+    throw new Error(
+      "Não foi possível carregar o painel de áreas: " +
+        (erroManejosAnimais?.message || erroManejosMedicamentos?.message),
+    );
   }
 
   const animais: AnimalResumo[] = animaisRaw.map((a) => ({
@@ -185,12 +202,23 @@ export default async function PainelAreasPage({
     quantidadePorManejo.set(linha.manejo_id, (quantidadePorManejo.get(linha.manejo_id) ?? 0) + 1);
   }
 
+  const medicamentosPorManejo = new Map<string, string[]>();
+  for (const linha of manejosMedicamentosRaw ?? []) {
+    const medicamento = primeiro(linha.medicamentos as { descricao: string } | { descricao: string }[] | null);
+    if (!medicamento) continue;
+    const lista = medicamentosPorManejo.get(linha.manejo_id) ?? [];
+    lista.push(medicamento.descricao);
+    medicamentosPorManejo.set(linha.manejo_id, lista);
+  }
+
   const manejos: ManejoResumo[] = (manejosRaw ?? []).map((m) => ({
     id: m.id,
     data: m.data,
     especie: m.especie as Especie,
     area_id: m.area_id,
     descricao: m.descricao,
+    responsavel: m.responsavel,
+    medicamentos: medicamentosPorManejo.get(m.id) ?? [],
     quantidade: quantidadePorManejo.get(m.id) ?? 0,
   }));
 

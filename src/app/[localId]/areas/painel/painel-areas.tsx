@@ -314,18 +314,27 @@ export function PainelAreas({ localId, areas, animais, mortes, movimentacoes, ma
                 )}
 
                 {chipsAtivos.has("manejos") && manejosArea.length > 0 && (
-                  <div className="mt-3 flex flex-col gap-1 border-t pt-3 pl-6">
+                  <div className="mt-3 flex flex-col gap-2 border-t pt-3 pl-6">
                     {manejosArea.map((m) => (
                       <Link
                         key={m.id}
                         href={`/${localId}/manejos/sanitarios`}
-                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:underline"
+                        className="flex items-start gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                       >
-                        <Stethoscope className="size-4 shrink-0" />
-                        <span className="truncate">
-                          {m.descricao ?? "Manejo sanitário"} ({m.quantidade}{" "}
-                          {m.quantidade === 1 ? "animal" : "animais"}) — {formatarData(m.data)}
-                        </span>
+                        <Stethoscope className="mt-0.5 size-4 shrink-0" />
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate hover:underline">
+                            {m.descricao ?? "Manejo sanitário"} ({m.quantidade}{" "}
+                            {m.quantidade === 1 ? "animal" : "animais"}) — {formatarData(m.data)}
+                          </span>
+                          {(m.medicamentos.length > 0 || m.responsavel) && (
+                            <span className="truncate text-xs">
+                              {m.medicamentos.length > 0 && m.medicamentos.join(", ")}
+                              {m.medicamentos.length > 0 && m.responsavel && " · "}
+                              {m.responsavel && `Responsável: ${m.responsavel}`}
+                            </span>
+                          )}
+                        </div>
                       </Link>
                     ))}
                   </div>

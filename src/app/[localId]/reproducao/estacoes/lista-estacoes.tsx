@@ -19,7 +19,12 @@ import {
 } from "@/components/ui/table";
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
 import { cn } from "@/lib/utils";
-import { salvarEstacaoReprodutiva, apagarEstacaoReprodutiva } from "@/lib/actions/estacoes-reprodutivas";
+import {
+  salvarEstacaoReprodutiva,
+  apagarEstacaoReprodutiva,
+  buscarResumoEstacaoParaExclusao,
+} from "@/lib/actions/estacoes-reprodutivas";
+import { DialogoApagarReprodutivo, type ResumoExclusaoReprodutiva } from "../_componentes/dialogo-apagar-reprodutivo";
 import type { Estacao, Especie } from "./page";
 
 const especies: { value: Especie; rotulo: string }[] = [
@@ -73,6 +78,9 @@ export function ListaEstacoes({ localId, estacoes, podeEditar }: Props) {
     desc: true,
   });
   const [selecionadoId, setSelecionadoId] = useState<string | "novo" | null>(null);
+  const [carregandoId, setCarregandoId] = useState<string | null>(null);
+  const [apagando, setApagando] = useState<{ estacao: Estacao; resumo: ResumoExclusaoReprodutiva } | null>(null);
+  const [apagandoEmAndamento, setApagandoEmAndamento] = useState(false);
 
   // Estações antigas (criadas antes da separação por espécie) não têm
   // espécie definida — mostra elas em qualquer aba, já que podem se
@@ -126,15 +134,28 @@ export function ListaEstacoes({ localId, estacoes, podeEditar }: Props) {
     setSelecionadoId("novo");
   }
 
-  async function excluir(e: Estacao) {
-    if (
-      !confirm(`Apagar a estação "${e.nome}"? Isso também apaga eventos, coberturas e diagnósticos registrados nela.`)
-    )
-      return;
+  async function abrirExclusao(e: Estacao) {
+    setCarregandoId(e.id);
     try {
-      await apagarEstacaoReprodutiva(localId, e.id);
+      const resumo = await buscarResumoEstacaoParaExclusao(e.id);
+      setApagando({ estacao: e, resumo });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível carregar a estação.");
+    } finally {
+      setCarregandoId(null);
+    }
+  }
+
+  async function confirmarExclusao() {
+    if (!apagando) return;
+    setApagandoEmAndamento(true);
+    try {
+      await apagarEstacaoReprodutiva(localId, apagando.estacao.id);
+      setApagando(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Não foi possível apagar.");
+    } finally {
+      setApagandoEmAndamento(false);
     }
   }
 
@@ -249,7 +270,8 @@ export function ListaEstacoes({ localId, estacoes, podeEditar }: Props) {
                       size="icon"
                       className="size-7 text-destructive"
                       title="Apagar"
-                      onClick={() => excluir(e)}
+                      disabled={carregandoId === e.id}
+                      onClick={() => abrirExclusao(e)}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -278,6 +300,15 @@ export function ListaEstacoes({ localId, estacoes, podeEditar }: Props) {
           onFechar={() => setSelecionadoId(null)}
         />
       )}
+
+      <DialogoApagarReprodutivo
+        titulo="Apagar esta estação?"
+        nome={apagando?.estacao.nome ?? ""}
+        resumo={apagando?.resumo ?? null}
+        emAndamento={apagandoEmAndamento}
+        onConfirmar={confirmarExclusao}
+        onFechar={() => setApagando(null)}
+      />
     </div>
   );
 }
