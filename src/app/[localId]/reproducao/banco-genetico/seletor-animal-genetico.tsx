@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card } from "@/components/ui/card";
 import type { CandidatoGenetico, Especie } from "./page";
 
 export function identificacaoCandidato(a: CandidatoGenetico) {
@@ -60,19 +59,23 @@ export function SeletorAnimalGenetico({
           onChange={(e) => setBusca(e.target.value)}
           autoFocus
         />
-        <div className="flex max-h-80 flex-col gap-1.5 overflow-y-auto">
-          {resultados.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">Nenhum animal encontrado.</p>
+        <div className="h-80 overflow-y-auto rounded-md border">
+          {resultados.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">Nenhum animal encontrado.</p>
+          ) : (
+            <div className="flex flex-col divide-y">
+              {resultados.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => onSelecionar(a.id, identificacaoCandidato(a))}
+                  className="px-3 py-2 text-left text-sm hover:bg-muted/50"
+                >
+                  {identificacaoCandidato(a)}
+                </button>
+              ))}
+            </div>
           )}
-          {resultados.map((a) => (
-            <Card
-              key={a.id}
-              className="cursor-pointer p-3 text-sm hover:bg-muted/50"
-              onClick={() => onSelecionar(a.id, identificacaoCandidato(a))}
-            >
-              {identificacaoCandidato(a)}
-            </Card>
-          ))}
         </div>
       </DialogContent>
     </Dialog>
