@@ -14,9 +14,50 @@ import { NavPrincipal } from "./nav-principal";
 
 const navegacaoPrincipal = [
   { rotulo: "Início", href: "" },
-  { rotulo: "Áreas", href: "/areas" },
-  { rotulo: "Categorias", href: "/categorias" },
+  { rotulo: "Animais", href: "/animais" },
+];
+
+// Registros de eventos do rebanho — começa com Mortes, outras ocorrências
+// (consumo, furto, ajuste) entram aqui conforme forem construídas.
+const navegacaoOcorrencias = [
+  { rotulo: "Mortes", href: "/ocorrencias/mortes" },
+  { rotulo: "Consumo", href: "/ocorrencias/consumo" },
+  { rotulo: "Furtos", href: "/ocorrencias/furtos" },
+  { rotulo: "Acerto de Contagem", href: "/ocorrencias/ajustes" },
+];
+
+// Tudo relacionado a categoria: cadastro das categorias em si e a rotina de
+// trocar animais de categoria (crescimento, mudança de finalidade etc.).
+const navegacaoCategorias = [
+  { rotulo: "Cadastro de Categorias", href: "/categorias" },
+  { rotulo: "Trocar de Categoria", href: "/categorias/trocar" },
+];
+
+// Tudo relacionado a área: cadastro das áreas em si e a rotina de mover
+// animais entre elas.
+const navegacaoAreas = [
+  { rotulo: "Painel de Áreas", href: "/areas/painel" },
+  { rotulo: "Cadastro de Áreas", href: "/areas" },
+  { rotulo: "Movimentação de Animais", href: "/areas/movimentacao" },
+];
+
+// Manejos aplicados ao rebanho — começa com Manejos Sanitários, outras
+// rotinas (nutricional, reprodutivo etc.) entram aqui conforme forem
+// construídas.
+const navegacaoManejos = [{ rotulo: "Manejos Sanitários", href: "/manejos/sanitarios" }];
+
+// Reprodução — começa pela Estação Reprodutiva (período de monta/cobertura
+// de cada espécie), outras rotinas (coberturas, diagnósticos, nascimentos)
+// entram aqui conforme forem construídas.
+const navegacaoReproducao = [{ rotulo: "Estação Reprodutiva", href: "/reproducao/estacoes" }];
+
+// Cadastros de apoio e administração do local — usados com pouca frequência
+// (bem menos que Animais/Ocorrências), por isso ficam agrupados fora da
+// barra principal.
+const navegacaoAjustes = [
   { rotulo: "Local e Membros", href: "/local" },
+  { rotulo: "Raças", href: "/racas" },
+  { rotulo: "Medicamentos", href: "/medicamentos" },
 ];
 
 export default async function LocalLayout({
@@ -73,7 +114,18 @@ export default async function LocalLayout({
               </DropdownMenu>
             )}
           </div>
-          <NavPrincipal localId={localId} itensPrincipais={navegacaoPrincipal} />
+          <NavPrincipal
+            localId={localId}
+            itensPrincipais={navegacaoPrincipal}
+            grupos={[
+              { rotulo: "Ocorrências", itens: navegacaoOcorrencias },
+              { rotulo: "Categorias", itens: navegacaoCategorias },
+              { rotulo: "Áreas", itens: navegacaoAreas },
+              { rotulo: "Manejos", itens: navegacaoManejos },
+              { rotulo: "Reprodução", itens: navegacaoReproducao },
+              { rotulo: "Ajustes", itens: navegacaoAjustes },
+            ]}
+          />
         </div>
         <form action={sair} className="shrink-0">
           <Button type="submit" variant="ghost" size="sm">

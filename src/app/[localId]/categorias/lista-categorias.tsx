@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useActionState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Tag, Download } from "lucide-react";
+import { Plus, Trash2, Tag, Download, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -17,9 +16,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { salvarCategoria, apagarCategoria, importarCategoriasSugeridas } from "@/lib/actions/categorias";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
+import { salvarCategoria, apagarCategoria } from "@/lib/actions/categorias";
 import { cn } from "@/lib/utils";
-import type { Categoria, CategoriaIvz, Especie } from "./page";
+import { DialogoImportarSugeridas } from "./dialogo-importar-sugeridas";
+import type { Categoria, CategoriaIvz, CategoriaSugerida, Especie } from "./page";
 
 const especies: { value: Especie; rotulo: string }[] = [
   { value: "bovino", rotulo: "Bovinos" },
@@ -28,18 +38,50 @@ const especies: { value: Especie; rotulo: string }[] = [
 ];
 
 const rotulosSexo: Record<string, string> = { macho: "Macho", femea: "Fêmea", desconhecido: "—" };
+const rotulosStatus: Record<string, string> = { ativa: "Ativa", inativa: "Inativa" };
+
+type ColunaId = "descricao" | "sexo" | "grupo" | "status";
+
+const colunas: { id: ColunaId; rotulo: string }[] = [
+  { id: "descricao", rotulo: "Descrição" },
+  { id: "sexo", rotulo: "Sexo" },
+  { id: "grupo", rotulo: "Grupo" },
+  { id: "status", rotulo: "Status" },
+];
+
+function valorOrdenacao(c: Categoria, coluna: ColunaId): string | number {
+  switch (coluna) {
+    case "descricao":
+      return c.descricao.toLowerCase();
+    case "sexo":
+      return rotulosSexo[c.sexo] ?? c.sexo;
+    case "grupo":
+      return (c.grupo ?? "").toLowerCase();
+    case "status":
+      return c.ativo ? 0 : 1;
+  }
+}
 
 type Props = {
   localId: string;
   categorias: Categoria[];
   categoriasIvz: CategoriaIvz[];
+  categoriasSugeridas: CategoriaSugerida[];
   podeEditar: boolean;
 };
 
-export function ListaCategorias({ localId, categorias, categoriasIvz, podeEditar }: Props) {
+export function ListaCategorias({ localId, categorias, categoriasIvz, categoriasSugeridas, podeEditar }: Props) {
   const [especie, setEspecie] = useState<Especie>("bovino");
+  const [busca, setBusca] = useState("");
+  const [sexosFiltro, setSexosFiltro] = useState<Set<string>>(new Set());
+  const [gruposFiltro, setGruposFiltro] = useState<Set<string>>(new Set());
+  const [statusFiltro, setStatusFiltro] = useState<Set<string>>(new Set());
+  const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({
+    coluna: "descricao",
+    desc: false,
+  });
   const [selecionadoId, setSelecionadoId] = useState<string | "novo" | null>(null);
-  const [importando, setImportando] = useState(false);
+  const [importarAberto, setImportarAberto] = useState(false);
 
   const categoriasDaEspecie = useMemo(
     () => categorias.filter((c) => c.especie === especie),
@@ -49,6 +91,41 @@ export function ListaCategorias({ localId, categorias, categoriasIvz, podeEditar
     () => categoriasIvz.filter((c) => c.especie === especie),
     [categoriasIvz, especie],
   );
+  const sugeridasDaEspecie = useMemo(
+    () => categoriasSugeridas.filter((s) => s.especie === especie),
+    [categoriasSugeridas, especie],
+  );
+  const descricoesJaImportadas = useMemo(
+    () => new Set(categoriasDaEspecie.map((c) => c.descricao.trim().toLowerCase())),
+    [categoriasDaEspecie],
+  );
+  const gruposDisponiveis = useMemo(
+    () => Array.from(new Set(categoriasDaEspecie.map((c) => c.grupo).filter((g): g is string => !!g))).sort(),
+    [categoriasDaEspecie],
+  );
+
+  function ordenarPor(coluna: ColunaId) {
+    setOrdenacao((atual) => (atual.coluna === coluna ? { coluna, desc: !atual.desc } : { coluna, desc: false }));
+  }
+
+  const dados = useMemo(() => {
+    const buscaMin = busca.trim().toLowerCase();
+    const filtrados = categoriasDaEspecie.filter((c) => {
+      if (sexosFiltro.size > 0 && !sexosFiltro.has(c.sexo)) return false;
+      if (gruposFiltro.size > 0 && (!c.grupo || !gruposFiltro.has(c.grupo))) return false;
+      if (statusFiltro.size > 0 && !statusFiltro.has(c.ativo ? "ativa" : "inativa")) return false;
+      if (!buscaMin) return true;
+      return [c.descricao, c.grupo, c.observacao].filter(Boolean).some((texto) => texto!.toLowerCase().includes(buscaMin));
+    });
+
+    return [...filtrados].sort((a, b) => {
+      const va = valorOrdenacao(a, ordenacao.coluna);
+      const vb = valorOrdenacao(b, ordenacao.coluna);
+      const cmp =
+        typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
+      return ordenacao.desc ? -cmp : cmp;
+    });
+  }, [categoriasDaEspecie, busca, sexosFiltro, gruposFiltro, statusFiltro, ordenacao]);
 
   const selecionado =
     selecionadoId === null
@@ -63,17 +140,6 @@ export function ListaCategorias({ localId, categorias, categoriasIvz, podeEditar
       await apagarCategoria(localId, id);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
-    }
-  }
-
-  async function importarSugeridas() {
-    setImportando(true);
-    try {
-      await importarCategoriasSugeridas(localId, especie);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Não foi possível importar.");
-    } finally {
-      setImportando(false);
     }
   }
 
@@ -97,52 +163,115 @@ export function ListaCategorias({ localId, categorias, categoriasIvz, podeEditar
             <Plus className="size-4" />
             Nova categoria
           </Button>
-          <Button size="sm" variant="outline" disabled={importando} onClick={importarSugeridas}>
+          <Button size="sm" variant="outline" onClick={() => setImportarAberto(true)}>
             <Download className="size-4" />
-            {importando ? "Importando..." : "Importar sugeridas"}
+            Importar sugeridas
           </Button>
         </div>
       )}
 
-      {categoriasDaEspecie.length === 0 ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Buscar por descrição, grupo ou observação..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          className="w-full md:max-w-64"
+        />
+        <FiltroMultiSelecao
+          rotulo="Todos os sexos"
+          className="w-full md:w-auto"
+          selecionados={sexosFiltro}
+          onChange={setSexosFiltro}
+          opcoes={Object.entries(rotulosSexo).map(([value, label]) => ({ value, label }))}
+        />
+        <FiltroMultiSelecao
+          rotulo="Todos os grupos"
+          className="w-full md:w-auto"
+          selecionados={gruposFiltro}
+          onChange={setGruposFiltro}
+          opcoes={gruposDisponiveis.map((g) => ({ value: g, label: g }))}
+        />
+        <FiltroMultiSelecao
+          rotulo="Todos os status"
+          className="w-full md:w-auto"
+          selecionados={statusFiltro}
+          onChange={setStatusFiltro}
+          opcoes={Object.entries(rotulosStatus).map(([value, label]) => ({ value, label }))}
+        />
+        <span className="text-sm text-muted-foreground">{dados.length} categoria(s)</span>
+      </div>
+
+      {dados.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-12 text-muted-foreground">
           <Tag className="size-8" />
-          <p>Nenhuma categoria cadastrada pra essa espécie ainda.</p>
+          <p>Nenhuma categoria encontrada.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-1">
-          {categoriasDaEspecie.map((c) => (
-            <Card
-              key={c.id}
-              className="flex-row items-center justify-between gap-2 px-4 py-3 cursor-pointer hover:bg-muted/40"
-              onClick={() => podeEditar && setSelecionadoId(c.id)}
-            >
-              <div className="flex min-w-0 flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{c.descricao}</span>
-                  {!c.ativo && <Badge variant="outline">Inativa</Badge>}
-                </div>
-                <span className="truncate text-sm text-muted-foreground">
-                  {[rotulosSexo[c.sexo] ?? c.sexo, c.grupo].filter(Boolean).join(" • ")}
-                </span>
-              </div>
-              {podeEditar && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 shrink-0 text-destructive"
-                  title="Apagar"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    excluir(c.id);
-                  }}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              )}
-            </Card>
-          ))}
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {colunas.map((coluna) => (
+                <TableHead key={coluna.id}>
+                  <button
+                    type="button"
+                    onClick={() => ordenarPor(coluna.id)}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    {coluna.rotulo}
+                    {ordenacao.coluna === coluna.id ? (
+                      ordenacao.desc ? (
+                        <ArrowDown className="size-3.5" />
+                      ) : (
+                        <ArrowUp className="size-3.5" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="size-3.5 text-muted-foreground/50" />
+                    )}
+                  </button>
+                </TableHead>
+              ))}
+              {podeEditar && <TableHead className="w-10" />}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {dados.map((c) => (
+              <TableRow
+                key={c.id}
+                className={podeEditar ? "cursor-pointer" : undefined}
+                onClick={() => podeEditar && setSelecionadoId(c.id)}
+              >
+                <TableCell className="font-medium">{c.descricao}</TableCell>
+                <TableCell>{rotulosSexo[c.sexo] ?? c.sexo}</TableCell>
+                <TableCell>{c.grupo ?? "—"}</TableCell>
+                <TableCell>
+                  <Badge variant={c.ativo ? "secondary" : "outline"}>{c.ativo ? "Ativa" : "Inativa"}</Badge>
+                </TableCell>
+                {podeEditar && (
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-destructive"
+                      title="Apagar"
+                      onClick={() => excluir(c.id)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell className="text-sm font-normal text-muted-foreground">
+                {dados.length} {dados.length === 1 ? "categoria" : "categorias"}
+              </TableCell>
+              <TableCell colSpan={colunas.length - 1} />
+              {podeEditar && <TableCell />}
+            </TableRow>
+          </TableFooter>
+        </Table>
       )}
 
       {podeEditar && (
@@ -154,6 +283,18 @@ export function ListaCategorias({ localId, categorias, categoriasIvz, podeEditar
           categoriasIvz={ivzDaEspecie}
           categoria={selecionado}
           onFechar={() => setSelecionadoId(null)}
+        />
+      )}
+
+      {podeEditar && (
+        <DialogoImportarSugeridas
+          key={especie}
+          localId={localId}
+          categoriasIvz={ivzDaEspecie}
+          aberto={importarAberto}
+          sugeridas={sugeridasDaEspecie}
+          descricoesJaImportadas={descricoesJaImportadas}
+          onFechar={() => setImportarAberto(false)}
         />
       )}
     </div>

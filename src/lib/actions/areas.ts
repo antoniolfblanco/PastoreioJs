@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
-export type EstadoArea = { erro?: string } | undefined;
+export type EstadoArea = { erro?: string; id?: string } | undefined;
 
 export async function salvarArea(
   _estadoAnterior: EstadoArea,
@@ -29,14 +29,14 @@ export async function salvarArea(
   };
 
   const supabase = await criarClienteServidor();
-  const { error } = id
-    ? await supabase.from("areas").update(dados).eq("id", id)
-    : await supabase.from("areas").insert(dados);
+  const { data, error } = id
+    ? await supabase.from("areas").update(dados).eq("id", id).select("id").single()
+    : await supabase.from("areas").insert(dados).select("id").single();
 
   if (error) return { erro: "Não foi possível salvar: " + error.message };
 
   revalidatePath(`/${localId}/areas`);
-  return {};
+  return { id: data.id };
 }
 
 export async function apagarArea(localId: string, id: string) {

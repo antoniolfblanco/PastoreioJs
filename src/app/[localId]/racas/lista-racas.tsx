@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useActionState, useEffect } from "react";
-import { Plus, Trash2, MapPin, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Plus, Trash2, Tag, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,57 +19,41 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
-import { salvarArea, apagarArea } from "@/lib/actions/areas";
-import type { Area } from "./page";
+import { salvarRaca, apagarRaca } from "@/lib/actions/racas";
+import type { Raca } from "./page";
 
 const rotulosStatus: Record<string, string> = { ativa: "Ativa", inativa: "Inativa" };
 
-function formatarTamanho(tamanho: number | null) {
-  return tamanho !== null ? `${tamanho} ha` : "—";
-}
+type ColunaId = "descricao" | "status";
 
-type ColunaId = "nome" | "tipo" | "tamanho" | "status";
-
-const colunas: { id: ColunaId; rotulo: string; alinhamento?: "right" }[] = [
-  { id: "nome", rotulo: "Nome" },
-  { id: "tipo", rotulo: "Tipo" },
-  { id: "tamanho", rotulo: "Tamanho", alinhamento: "right" },
+const colunas: { id: ColunaId; rotulo: string }[] = [
+  { id: "descricao", rotulo: "Nome" },
   { id: "status", rotulo: "Status" },
 ];
 
-function valorOrdenacao(a: Area, coluna: ColunaId): string | number {
+function valorOrdenacao(r: Raca, coluna: ColunaId): string | number {
   switch (coluna) {
-    case "nome":
-      return a.nome.toLowerCase();
-    case "tipo":
-      return (a.tipo ?? "").toLowerCase();
-    case "tamanho":
-      return a.tamanho ?? -Infinity;
+    case "descricao":
+      return r.descricao.toLowerCase();
     case "status":
-      return a.ativo ? 0 : 1;
+      return r.ativo ? 0 : 1;
   }
 }
 
 type Props = {
   localId: string;
-  areas: Area[];
+  racas: Raca[];
   podeEditar: boolean;
 };
 
-export function ListaAreas({ localId, areas, podeEditar }: Props) {
+export function ListaRacas({ localId, racas, podeEditar }: Props) {
   const [busca, setBusca] = useState("");
-  const [tiposFiltro, setTiposFiltro] = useState<Set<string>>(new Set());
   const [statusFiltro, setStatusFiltro] = useState<Set<string>>(new Set());
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({
-    coluna: "nome",
+    coluna: "descricao",
     desc: false,
   });
   const [selecionadoId, setSelecionadoId] = useState<string | "novo" | null>(null);
-
-  const tiposDisponiveis = useMemo(
-    () => Array.from(new Set(areas.map((a) => a.tipo).filter((t): t is string => !!t))).sort(),
-    [areas],
-  );
 
   function ordenarPor(coluna: ColunaId) {
     setOrdenacao((atual) => (atual.coluna === coluna ? { coluna, desc: !atual.desc } : { coluna, desc: false }));
@@ -77,11 +61,10 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
 
   const dados = useMemo(() => {
     const buscaMin = busca.trim().toLowerCase();
-    const filtrados = areas.filter((a) => {
-      if (tiposFiltro.size > 0 && (!a.tipo || !tiposFiltro.has(a.tipo))) return false;
-      if (statusFiltro.size > 0 && !statusFiltro.has(a.ativo ? "ativa" : "inativa")) return false;
+    const filtrados = racas.filter((r) => {
+      if (statusFiltro.size > 0 && !statusFiltro.has(r.ativo ? "ativa" : "inativa")) return false;
       if (!buscaMin) return true;
-      return [a.nome, a.tipo, a.observacoes].filter(Boolean).some((texto) => texto!.toLowerCase().includes(buscaMin));
+      return [r.descricao, r.observacoes].filter(Boolean).some((texto) => texto!.toLowerCase().includes(buscaMin));
     });
 
     return [...filtrados].sort((a, b) => {
@@ -91,24 +74,21 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
         typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
       return ordenacao.desc ? -cmp : cmp;
     });
-  }, [areas, busca, tiposFiltro, statusFiltro, ordenacao]);
-
-  const totalTamanho = useMemo(() => dados.reduce((soma, a) => soma + (a.tamanho ?? 0), 0), [dados]);
-  const indiceTamanho = colunas.findIndex((c) => c.id === "tamanho");
+  }, [racas, busca, statusFiltro, ordenacao]);
 
   const selecionado =
     selecionadoId === null
       ? null
       : selecionadoId === "novo"
         ? "novo"
-        : (areas.find((a) => a.id === selecionadoId) ?? null);
+        : (racas.find((r) => r.id === selecionadoId) ?? null);
 
-  async function excluir(id: string) {
-    if (!confirm("Apagar esta área?")) return;
+  async function excluir(r: Raca) {
+    if (!confirm(`Apagar a raça "${r.descricao}"?`)) return;
     try {
-      await apagarArea(localId, id);
+      await apagarRaca(localId, r.id);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Não foi possível apagar.");
+      alert(e instanceof Error ? e.message : "Não foi possível apagar — ela já pode ter sido usada em algum animal.");
     }
   }
 
@@ -118,24 +98,17 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
         <div>
           <Button size="sm" onClick={() => setSelecionadoId("novo")}>
             <Plus className="size-4" />
-            Nova área
+            Nova raça
           </Button>
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Buscar por nome, tipo ou observações..."
+          placeholder="Buscar por nome ou observações..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           className="w-full md:max-w-64"
-        />
-        <FiltroMultiSelecao
-          rotulo="Todos os tipos"
-          className="w-full md:w-auto"
-          selecionados={tiposFiltro}
-          onChange={setTiposFiltro}
-          opcoes={tiposDisponiveis.map((t) => ({ value: t, label: t }))}
         />
         <FiltroMultiSelecao
           rotulo="Todos os status"
@@ -144,26 +117,24 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
           onChange={setStatusFiltro}
           opcoes={Object.entries(rotulosStatus).map(([value, label]) => ({ value, label }))}
         />
-        <span className="text-sm text-muted-foreground">{dados.length} área(s)</span>
+        <span className="text-sm text-muted-foreground">{dados.length} raça(s)</span>
       </div>
 
       {dados.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-12 text-muted-foreground">
-          <MapPin className="size-8" />
-          <p>Nenhuma área encontrada.</p>
+          <Tag className="size-8" />
+          <p>Nenhuma raça encontrada.</p>
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
               {colunas.map((coluna) => (
-                <TableHead key={coluna.id} className={coluna.alinhamento === "right" ? "text-right" : undefined}>
+                <TableHead key={coluna.id}>
                   <button
                     type="button"
                     onClick={() => ordenarPor(coluna.id)}
-                    className={`inline-flex items-center gap-1 hover:text-foreground ${
-                      coluna.alinhamento === "right" ? "flex-row-reverse" : ""
-                    }`}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
                   >
                     {coluna.rotulo}
                     {ordenacao.coluna === coluna.id ? (
@@ -182,17 +153,24 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {dados.map((a) => (
+            {dados.map((r) => (
               <TableRow
-                key={a.id}
+                key={r.id}
                 className={podeEditar ? "cursor-pointer" : undefined}
-                onClick={() => podeEditar && setSelecionadoId(a.id)}
+                onClick={() => podeEditar && setSelecionadoId(r.id)}
               >
-                <TableCell className="font-medium">{a.nome}</TableCell>
-                <TableCell>{a.tipo ?? "—"}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatarTamanho(a.tamanho)}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {r.descricao}
+                    {r.padrao && (
+                      <Badge variant="outline" title="Usada quando nenhuma raça é informada">
+                        Padrão
+                      </Badge>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>
-                  <Badge variant={a.ativo ? "secondary" : "outline"}>{a.ativo ? "Ativa" : "Inativa"}</Badge>
+                  <Badge variant={r.ativo ? "secondary" : "outline"}>{r.ativo ? "Ativa" : "Inativa"}</Badge>
                 </TableCell>
                 {podeEditar && (
                   <TableCell onClick={(e) => e.stopPropagation()}>
@@ -201,7 +179,8 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
                       size="icon"
                       className="size-7 text-destructive"
                       title="Apagar"
-                      onClick={() => excluir(a.id)}
+                      disabled={r.padrao}
+                      onClick={() => excluir(r)}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -212,14 +191,9 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
           </TableBody>
           <TableFooter>
             <TableRow>
-              <TableCell className="text-sm font-normal text-muted-foreground">
-                {dados.length} {dados.length === 1 ? "área" : "áreas"}
+              <TableCell colSpan={colunas.length} className="text-sm font-normal text-muted-foreground">
+                {dados.length} {dados.length === 1 ? "raça" : "raças"}
               </TableCell>
-              <TableCell colSpan={indiceTamanho - 1} className="text-right font-medium">
-                Total
-              </TableCell>
-              <TableCell className="text-right font-medium tabular-nums">{formatarTamanho(totalTamanho)}</TableCell>
-              <TableCell colSpan={colunas.length - indiceTamanho - 1} />
               {podeEditar && <TableCell />}
             </TableRow>
           </TableFooter>
@@ -227,12 +201,10 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
       )}
 
       {podeEditar && (
-        <DialogoArea
-          // Sem key, o diálogo não remonta ao trocar de área e o useState de
-          // "ativo" fica preso no valor da primeira montagem.
+        <DialogoRaca
           key={selecionadoId ?? "fechado"}
           localId={localId}
-          area={selecionado}
+          raca={selecionado}
           onFechar={() => setSelecionadoId(null)}
         />
       )}
@@ -240,17 +212,17 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
   );
 }
 
-function DialogoArea({
+function DialogoRaca({
   localId,
-  area,
+  raca,
   onFechar,
 }: {
   localId: string;
-  area: Area | "novo" | null;
+  raca: Raca | "novo" | null;
   onFechar: () => void;
 }) {
-  const [resultado, acao, emAndamento] = useActionState(salvarArea, undefined);
-  const existente = area && area !== "novo" ? area : null;
+  const [resultado, acao, emAndamento] = useActionState(salvarRaca, undefined);
+  const existente = raca && raca !== "novo" ? raca : null;
   const [ativo, setAtivo] = useState(existente?.ativo ?? true);
 
   useEffect(() => {
@@ -259,41 +231,18 @@ function DialogoArea({
   }, [resultado]);
 
   return (
-    <Dialog open={area !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
+    <Dialog open={raca !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{existente ? "Editar área" : "Nova área"}</DialogTitle>
+          <DialogTitle>{existente ? "Editar raça" : "Nova raça"}</DialogTitle>
         </DialogHeader>
-        {area && (
+        {raca && (
           <form key={existente?.id ?? "novo"} action={acao} className="flex flex-col gap-4">
             <input type="hidden" name="localId" value={localId} />
             {existente && <input type="hidden" name="id" value={existente.id} />}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="nome">Nome</Label>
-              <Input
-                id="nome"
-                name="nome"
-                required
-                autoFocus
-                placeholder="Ex.: Piquete 3"
-                defaultValue={existente?.nome}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="tipo">Tipo</Label>
-                <Input id="tipo" name="tipo" placeholder="Ex.: Pasto" defaultValue={existente?.tipo ?? ""} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="tamanho">Tamanho (ha)</Label>
-                <Input
-                  id="tamanho"
-                  name="tamanho"
-                  type="number"
-                  step="0.01"
-                  defaultValue={existente?.tamanho ?? ""}
-                />
-              </div>
+              <Label htmlFor="descricao">Nome</Label>
+              <Input id="descricao" name="descricao" required autoFocus defaultValue={existente?.descricao} />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="observacoes">Observações</Label>
@@ -302,12 +251,20 @@ function DialogoArea({
             <div className="flex items-center gap-2">
               <Checkbox
                 id="ativo"
-                name="ativo"
-                checked={ativo}
+                name={existente?.padrao ? undefined : "ativo"}
+                checked={existente?.padrao ? true : ativo}
                 onCheckedChange={(v) => setAtivo(v === true)}
+                disabled={existente?.padrao}
               />
-              <Label htmlFor="ativo">Área ativa</Label>
+              <Label htmlFor="ativo">Raça ativa</Label>
+              {existente?.padrao && <input type="hidden" name="ativo" value="on" />}
             </div>
+            {existente?.padrao && (
+              <p className="text-sm text-muted-foreground">
+                Esta é a raça padrão do local (usada quando nenhuma é informada) — não pode ficar inativa nem ser
+                apagada.
+              </p>
+            )}
             {resultado?.erro && <p className="text-sm text-destructive">{resultado.erro}</p>}
             <DialogFooter>
               <Button type="submit" disabled={emAndamento}>

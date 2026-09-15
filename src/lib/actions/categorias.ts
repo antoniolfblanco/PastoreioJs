@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
-export type EstadoCategoria = { erro?: string } | undefined;
+export type EstadoCategoria = { erro?: string; id?: string; sexo?: string } | undefined;
 
 export async function salvarCategoria(
   _estadoAnterior: EstadoCategoria,
@@ -45,14 +45,14 @@ export async function salvarCategoria(
     ativo,
   };
 
-  const { error } = id
-    ? await supabase.from("categorias").update(dados).eq("id", id)
-    : await supabase.from("categorias").insert(dados);
+  const { data, error } = id
+    ? await supabase.from("categorias").update(dados).eq("id", id).select("id").single()
+    : await supabase.from("categorias").insert(dados).select("id").single();
 
   if (error) return { erro: "Não foi possível salvar: " + error.message };
 
   revalidatePath(`/${localId}/categorias`);
-  return {};
+  return { id: data.id, sexo: ivz.sexo };
 }
 
 export async function apagarCategoria(localId: string, id: string) {
@@ -62,11 +62,16 @@ export async function apagarCategoria(localId: string, id: string) {
   revalidatePath(`/${localId}/categorias`);
 }
 
-// Copia em lote os templates nacionais (categorias_sugeridas) da espécie
-// escolhida pras categorias do local — evita cadastrar uma por uma. Pula as
-// que já existem no local (mesma categoria_ivz_id), pra poder chamar de novo
-// sem duplicar.
-export async function importarCategoriasSugeridas(localId: string, especie: string) {
+// Copia os templates nacionais (categorias_sugeridas) escolhidos na tela de
+// importação pras categorias do local — evita cadastrar uma por uma.
+// `sugeridaIds` são os ids marcados pelo usuário. A checagem de duplicata é
+// por descrição, não por categoria_ivz_id: o IVZ é um código oficial que
+// várias sugestões podem compartilhar (ex.: "Potros" e "Potrancos" são
+// ambas "Equinos Machos +6 Meses" pro IVZ), então duas categorias distintas
+// do local podem legitimamente apontar pro mesmo categoria_ivz_id.
+export async function importarCategoriasSugeridas(localId: string, sugeridaIds: string[]) {
+  if (sugeridaIds.length === 0) return;
+
   const supabase = await criarClienteServidor();
 
   const [{ data: sugeridas, error: erroSugeridas }, { data: existentes, error: erroExistentes }] =
@@ -74,18 +79,16 @@ export async function importarCategoriasSugeridas(localId: string, especie: stri
       supabase
         .from("categorias_sugeridas")
         .select("descricao, especie, sexo, ordem, categoria_ivz_id")
-        .eq("especie", especie)
-        .eq("ativo", true)
-        .order("ordem"),
-      supabase.from("categorias").select("categoria_ivz_id").eq("local_id", localId),
+        .in("id", sugeridaIds),
+      supabase.from("categorias").select("descricao").eq("local_id", localId),
     ]);
 
   if (erroSugeridas) throw new Error(erroSugeridas.message);
   if (erroExistentes) throw new Error(erroExistentes.message);
 
-  const jaTem = new Set((existentes ?? []).map((c) => c.categoria_ivz_id));
+  const jaTem = new Set((existentes ?? []).map((c) => c.descricao.trim().toLowerCase()));
   const novas = (sugeridas ?? [])
-    .filter((s) => !jaTem.has(s.categoria_ivz_id))
+    .filter((s) => !jaTem.has(s.descricao.trim().toLowerCase()))
     .map((s) => ({
       local_id: localId,
       categoria_ivz_id: s.categoria_ivz_id,
