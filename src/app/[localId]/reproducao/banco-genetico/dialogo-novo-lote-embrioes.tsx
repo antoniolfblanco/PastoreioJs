@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { adicionarLoteEmbrioes } from "@/lib/actions/banco-genetico";
-import { SeletorAnimalGenetico } from "./seletor-animal-genetico";
+import { CampoAnimalGenetico } from "./campo-animal-genetico";
 import type { CandidatoGenetico, Especie } from "./page";
 
 const hojeISO = new Date().toISOString().slice(0, 10);
@@ -27,13 +27,10 @@ export function DialogoNovoLoteEmbrioes({
 }) {
   const [resultado, acao, emAndamento] = useActionState(adicionarLoteEmbrioes, undefined);
   const [doadoraId, setDoadoraId] = useState("");
-  const [doadoraResumo, setDoadoraResumo] = useState("");
   const [touroId, setTouroId] = useState("");
-  const [touroResumo, setTouroResumo] = useState("");
   const [quantidade, setQuantidade] = useState("1");
   const [dataProducao, setDataProducao] = useState("");
   const [observacoes, setObservacoes] = useState("");
-  const [seletorAberto, setSeletorAberto] = useState<"doadora" | "touro" | null>(null);
 
   useEffect(() => {
     if (resultado === undefined || resultado.erro) return;
@@ -42,106 +39,75 @@ export function DialogoNovoLoteEmbrioes({
   }, [resultado]);
 
   return (
-    <>
-      <Dialog open={aberto} onOpenChange={(estaAberto) => !estaAberto && onFechar()}>
-        <DialogContent key={aberto ? "aberto" : "fechado"}>
-          <DialogHeader>
-            <DialogTitle>Adicionar lote de embriões</DialogTitle>
-          </DialogHeader>
-          <form action={acao} className="flex flex-col gap-4">
-            <input type="hidden" name="localId" value={localId} />
-            <input type="hidden" name="especie" value={especie} />
-            <input type="hidden" name="doadoraId" value={doadoraId} />
-            <input type="hidden" name="touroId" value={touroId} />
-            <div className="flex flex-col gap-2">
-              <Label>Doadora</Label>
-              <Button
-                type="button"
-                variant="outline"
-                className="justify-start font-normal"
-                onClick={() => setSeletorAberto("doadora")}
-              >
-                {doadoraResumo || "Selecionar..."}
-              </Button>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Touro</Label>
-              <Button
-                type="button"
-                variant="outline"
-                className="justify-start font-normal"
-                onClick={() => setSeletorAberto("touro")}
-              >
-                {touroResumo || "Selecionar..."}
-              </Button>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="quantidadeEmbrioes">Quantidade de embriões</Label>
-              <Input
-                id="quantidadeEmbrioes"
-                name="quantidade"
-                type="number"
-                min={1}
-                value={quantidade}
-                onChange={(e) => setQuantidade(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="dataProducaoEmbrioes">Data de produção</Label>
-              <Input
-                id="dataProducaoEmbrioes"
-                name="dataProducao"
-                type="date"
-                max={hojeISO}
-                value={dataProducao}
-                onChange={(e) => setDataProducao(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="observacoesEmbrioes">Observações</Label>
-              <Textarea
-                id="observacoesEmbrioes"
-                name="observacoes"
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-              />
-            </div>
-            {resultado?.erro && <p className="text-sm text-destructive">{resultado.erro}</p>}
-            <DialogFooter>
-              <Button type="submit" disabled={emAndamento || !doadoraId || !touroId}>
-                {emAndamento ? "Adicionando..." : "Adicionar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <SeletorAnimalGenetico
-        aberto={seletorAberto === "doadora"}
-        titulo="Selecionar doadora"
-        sexo="femea"
-        especie={especie}
-        candidatos={candidatos}
-        onSelecionar={(id, resumo) => {
-          setDoadoraId(id);
-          setDoadoraResumo(resumo);
-          setSeletorAberto(null);
-        }}
-        onFechar={() => setSeletorAberto(null)}
-      />
-      <SeletorAnimalGenetico
-        aberto={seletorAberto === "touro"}
-        titulo="Selecionar touro"
-        sexo="macho"
-        especie={especie}
-        candidatos={candidatos}
-        onSelecionar={(id, resumo) => {
-          setTouroId(id);
-          setTouroResumo(resumo);
-          setSeletorAberto(null);
-        }}
-        onFechar={() => setSeletorAberto(null)}
-      />
-    </>
+    <Dialog open={aberto} onOpenChange={(estaAberto) => !estaAberto && onFechar()}>
+      <DialogContent key={aberto ? "aberto" : "fechado"}>
+        <DialogHeader>
+          <DialogTitle>Adicionar lote de embriões</DialogTitle>
+        </DialogHeader>
+        <form action={acao} className="flex flex-col gap-4">
+          <input type="hidden" name="localId" value={localId} />
+          <input type="hidden" name="especie" value={especie} />
+          <input type="hidden" name="doadoraId" value={doadoraId} />
+          <input type="hidden" name="touroId" value={touroId} />
+          <CampoAnimalGenetico
+            htmlId="doadoraLote"
+            localId={localId}
+            rotulo="Doadora"
+            sexo="femea"
+            especie={especie}
+            candidatos={candidatos}
+            value={doadoraId}
+            onValueChange={setDoadoraId}
+          />
+          <CampoAnimalGenetico
+            htmlId="touroLote"
+            localId={localId}
+            rotulo="Touro"
+            sexo="macho"
+            especie={especie}
+            candidatos={candidatos}
+            value={touroId}
+            onValueChange={setTouroId}
+          />
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="quantidadeEmbrioes">Quantidade de embriões</Label>
+            <Input
+              id="quantidadeEmbrioes"
+              name="quantidade"
+              type="number"
+              min={1}
+              value={quantidade}
+              onChange={(e) => setQuantidade(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="dataProducaoEmbrioes">Data de produção</Label>
+            <Input
+              id="dataProducaoEmbrioes"
+              name="dataProducao"
+              type="date"
+              max={hojeISO}
+              value={dataProducao}
+              onChange={(e) => setDataProducao(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="observacoesEmbrioes">Observações</Label>
+            <Textarea
+              id="observacoesEmbrioes"
+              name="observacoes"
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+            />
+          </div>
+          {resultado?.erro && <p className="text-sm text-destructive">{resultado.erro}</p>}
+          <DialogFooter>
+            <Button type="submit" disabled={emAndamento || !doadoraId || !touroId}>
+              {emAndamento ? "Adicionando..." : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
