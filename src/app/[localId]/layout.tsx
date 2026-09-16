@@ -31,6 +31,7 @@ const navegacaoOcorrencias = [
 const navegacaoCategorias = [
   { rotulo: "Cadastro de Categorias", href: "/categorias" },
   { rotulo: "Trocar de Categoria", href: "/categorias/trocar" },
+  { rotulo: "Lotação por Categorias", href: "/categorias/lotacao" },
 ];
 
 // Tudo relacionado a área: cadastro das áreas em si e a rotina de mover
@@ -58,6 +59,13 @@ const navegacaoReproducao = [
   { rotulo: "Animais Externos", href: "/reproducao/externos" },
   { rotulo: "Banco Genético", href: "/reproducao/banco-genetico" },
   { rotulo: "Lotes RM", href: "/reproducao/lotes-rm" },
+];
+
+// Entrada e saída de animais do rebanho por compra/venda — eventos
+// financeiros e de estoque, distintos de nascimento/morte.
+const navegacaoComprasVendas = [
+  { rotulo: "Comprar Animais", href: "/compras" },
+  { rotulo: "Vender Animais", href: "/vendas" },
 ];
 
 // Cadastros de apoio e administração do local — usados com pouca frequência
@@ -132,6 +140,7 @@ export default async function LocalLayout({
               { rotulo: "Áreas", itens: navegacaoAreas },
               { rotulo: "Manejos", itens: navegacaoManejos },
               { rotulo: "Reprodução", itens: navegacaoReproducao },
+              { rotulo: "Compras e Vendas", itens: navegacaoComprasVendas },
               { rotulo: "Ajustes", itens: navegacaoAjustes },
             ]}
           />
