@@ -19,12 +19,37 @@ export function DialogoRemoverDoses({
   touro: TouroComEstoque | null;
   onFechar: () => void;
 }) {
+  return (
+    <Dialog open={touro !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Remover doses — {touro?.identificacao}</DialogTitle>
+        </DialogHeader>
+        {/* Chave no conteúdo, nunca no DialogContent: remontar o Popup no
+            meio da própria transição de fechamento fazia a janela "voltar"
+            — reabrir sozinha assim que o usuário clicava. */}
+        {touro && (
+          <ConteudoRemoverDoses key={touro.touro_id} localId={localId} touro={touro} onFechar={onFechar} />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConteudoRemoverDoses({
+  localId,
+  touro,
+  onFechar,
+}: {
+  localId: string;
+  touro: TouroComEstoque;
+  onFechar: () => void;
+}) {
   const [quantidade, setQuantidade] = useState("1");
   const [emAndamento, setEmAndamento] = useState(false);
   const [erro, setErro] = useState<string | undefined>();
 
   async function remover() {
-    if (!touro) return;
     const valor = Number(quantidade);
     if (!Number.isInteger(valor) || valor < 1) {
       setErro("Informe uma quantidade válida.");
@@ -43,31 +68,24 @@ export function DialogoRemoverDoses({
   }
 
   return (
-    <Dialog open={touro !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
-      <DialogContent key={touro?.touro_id ?? "fechado"} className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Remover doses — {touro?.identificacao}</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="quantidadeRemover">Quantidade a remover</Label>
-            <Input
-              id="quantidadeRemover"
-              type="number"
-              min={1}
-              autoFocus
-              value={quantidade}
-              onChange={(e) => setQuantidade(e.target.value)}
-            />
-          </div>
-          {erro && <p className="text-sm text-destructive">{erro}</p>}
-          <DialogFooter>
-            <Button type="button" disabled={emAndamento} onClick={remover}>
-              {emAndamento ? "Removendo..." : "Remover"}
-            </Button>
-          </DialogFooter>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="quantidadeRemover">Quantidade a remover</Label>
+        <Input
+          id="quantidadeRemover"
+          type="number"
+          min={1}
+          autoFocus
+          value={quantidade}
+          onChange={(e) => setQuantidade(e.target.value)}
+        />
+      </div>
+      {erro && <p className="text-sm text-destructive">{erro}</p>}
+      <DialogFooter>
+        <Button type="button" disabled={emAndamento} onClick={remover}>
+          {emAndamento ? "Removendo..." : "Remover"}
+        </Button>
+      </DialogFooter>
+    </div>
   );
 }

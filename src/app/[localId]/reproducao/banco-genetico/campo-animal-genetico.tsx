@@ -17,10 +17,9 @@ function identificacaoCandidato(a: CandidatoGenetico) {
 // diálogos centralizados um sobre o outro (o de registrar + o de
 // selecionar) causavam clique-fantasma: o clique que fechava o seletor
 // caía de novo no botão "Selecionar..." que ficava exposto embaixo, na
-// mesma posição, reabrindo o seletor. O "+" abre o cadastro de Animais
-// Externos numa aba nova, sem perder o que já foi preenchido aqui (mesmo
-// espírito do atalho do app Flutter, que navega pra tela de cadastro e
-// volta).
+// mesma posição, reabrindo o seletor. O "+" leva pra Animais Externos na
+// mesma aba — o que já foi digitado aqui (quantidade, observações) se
+// perde ao navegar, mas evita empilhar abas.
 export function CampoAnimalGenetico({
   htmlId,
   localId,
@@ -134,8 +133,8 @@ export function CampoAnimalGenetico({
           type="button"
           variant="outline"
           size="icon-sm"
-          title="Cadastrar animal externo (abre em nova aba)"
-          render={<Link href={`/${localId}/reproducao/externos`} target="_blank" rel="noopener noreferrer" />}
+          title="Cadastrar animal externo"
+          render={<Link href={`/${localId}/reproducao/externos`} />}
         >
           <Plus className="size-4" />
         </Button>

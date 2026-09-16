@@ -26,6 +26,43 @@ export function SeletorAnimaisManejo({
   onFechar: () => void;
   onConfirmar: (selecionados: Set<string>) => void;
 }) {
+  return (
+    <Dialog
+      open={aberto}
+      onOpenChange={(valor) => {
+        if (!valor) onFechar();
+      }}
+    >
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Selecionar animais</DialogTitle>
+        </DialogHeader>
+        {/* Chave no conteúdo, nunca no DialogContent: remontar o Popup no
+            meio da própria transição de fechamento fazia a janela "voltar"
+            — reabrir sozinha assim que o usuário confirmava a seleção. */}
+        <ConteudoSeletorAnimaisManejo
+          key={aberto ? "aberto" : "fechado"}
+          especie={especie}
+          animais={animais}
+          selecionadosIniciais={selecionadosIniciais}
+          onConfirmar={onConfirmar}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConteudoSeletorAnimaisManejo({
+  especie,
+  animais,
+  selecionadosIniciais,
+  onConfirmar,
+}: {
+  especie: Especie;
+  animais: AnimalManejo[];
+  selecionadosIniciais: Set<string>;
+  onConfirmar: (selecionados: Set<string>) => void;
+}) {
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set(selecionadosIniciais));
 
@@ -49,47 +86,37 @@ export function SeletorAnimaisManejo({
   }
 
   return (
-    <Dialog
-      open={aberto}
-      onOpenChange={(valor) => {
-        if (!valor) onFechar();
-      }}
-    >
-      <DialogContent key={aberto ? "aberto" : "fechado"} className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Selecionar animais</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <Input
-            placeholder="Buscar por nome, brinco, tatuagem ou raça..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-          />
-          <p className="text-sm text-muted-foreground">{selecionados.size} selecionado(s)</p>
-          <div className="h-80 overflow-y-auto rounded-md border">
-            <div className="flex flex-col divide-y">
-              {dados.length === 0 && (
-                <p className="p-4 text-sm text-muted-foreground">Nenhum animal encontrado.</p>
-              )}
-              {dados.map((a) => (
-                <label
-                  key={a.id}
-                  className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"
-                >
-                  <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => alternar(a.id)} />
-                  <span className="flex-1">{identificacao(a)}</span>
-                  <span className="text-muted-foreground">{a.categoria_descricao}</span>
-                </label>
-              ))}
-            </div>
+    <>
+      <div className="flex flex-col gap-3">
+        <Input
+          placeholder="Buscar por nome, brinco, tatuagem ou raça..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        <p className="text-sm text-muted-foreground">{selecionados.size} selecionado(s)</p>
+        <div className="h-80 overflow-y-auto rounded-md border">
+          <div className="flex flex-col divide-y">
+            {dados.length === 0 && (
+              <p className="p-4 text-sm text-muted-foreground">Nenhum animal encontrado.</p>
+            )}
+            {dados.map((a) => (
+              <label
+                key={a.id}
+                className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50"
+              >
+                <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => alternar(a.id)} />
+                <span className="flex-1">{identificacao(a)}</span>
+                <span className="text-muted-foreground">{a.categoria_descricao}</span>
+              </label>
+            ))}
           </div>
         </div>
-        <DialogFooter>
-          <Button type="button" onClick={() => onConfirmar(selecionados)}>
-            Confirmar ({selecionados.size})
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+      <DialogFooter>
+        <Button type="button" onClick={() => onConfirmar(selecionados)}>
+          Confirmar ({selecionados.size})
+        </Button>
+      </DialogFooter>
+    </>
   );
 }
