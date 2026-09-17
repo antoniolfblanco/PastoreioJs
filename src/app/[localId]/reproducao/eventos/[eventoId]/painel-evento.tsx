@@ -15,8 +15,11 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
+  adicionarReceptorasEvento,
+  confirmarAcasalamentoEmbriao,
   confirmarAcasalamentos,
   desfazerAcasalamento,
   registrarDiagnosticosGestacao,
@@ -25,8 +28,8 @@ import {
 import { SeletorAnimalEvento } from "./seletor-animal-evento";
 import { DialogoAdicionarDosesSemen } from "./dialogo-adicionar-doses-semen";
 import { DialogoAdicionarParticipantes } from "./dialogo-adicionar-participantes";
-import { DialogoAdicionarParticipantesEmbriao } from "./dialogo-adicionar-participantes-embriao";
 import { DialogoConfirmarAcasalamento } from "./dialogo-confirmar-acasalamento";
+import { DialogoConfirmarAcasalamentoEmbriao } from "./dialogo-confirmar-acasalamento-embriao";
 import { DialogoDiagnostico } from "./dialogo-diagnostico";
 import type {
   CandidatoAnimal,
@@ -106,6 +109,7 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [adicionandoAberto, setAdicionandoAberto] = useState(false);
   const [confirmandoIds, setConfirmandoIds] = useState<string[] | null>(null);
+  const [confirmandoEmbriaoIds, setConfirmandoEmbriaoIds] = useState<string[] | null>(null);
   const [diagnosticando, setDiagnosticando] = useState<Participante[] | null>(null);
   const [removendoId, setRemovendoId] = useState<string | null>(null);
   const [linhaEmAndamento, setLinhaEmAndamento] = useState<string | null>(null);
@@ -161,6 +165,22 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
         coberturaIds: [participanteId],
         touroId,
         rmLoteId: null,
+        data: dataAcasalamentoPorLinha[participanteId] || hojeISO,
+        responsavel: null,
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível confirmar.");
+    } finally {
+      setLinhaEmAndamento(null);
+    }
+  }
+
+  async function confirmarLinhaEmbriao(participanteId: string, loteEmbriaoId: string) {
+    setLinhaEmAndamento(participanteId);
+    try {
+      await confirmarAcasalamentoEmbriao(localId, evento.id, {
+        coberturaIds: [participanteId],
+        loteEmbriaoId,
         data: dataAcasalamentoPorLinha[participanteId] || hojeISO,
         responsavel: null,
       });
@@ -274,8 +294,7 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
             <TableBody>
               {participantes.map((p) => {
                 const podeEditarLinha = podeEditar && linhaEmAndamento !== p.id;
-                const podeDesfazer =
-                  podeEditar && !isTeFiv && p.confirmada && !p.pariu && !p.ultimoDiagnosticoResultado;
+                const podeDesfazer = podeEditar && p.confirmada && !p.pariu && !p.ultimoDiagnosticoResultado;
                 return (
                   <TableRow key={p.id} data-selecionado={selecionados.has(p.id) || undefined}>
                     {podeEditar && (
@@ -285,7 +304,7 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
                     )}
                     <TableCell className="font-medium">{p.identificacao}</TableCell>
                     <TableCell>
-                      {isTeFiv || p.confirmada ? (
+                      {p.confirmada ? (
                         <div className="flex items-center gap-1">
                           <span>{p.touroNome ?? p.rmLoteNome ?? "—"}</span>
                           {podeDesfazer && (
@@ -300,6 +319,46 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
                               <X className="size-3.5" />
                             </Button>
                           )}
+                        </div>
+                      ) : podeEditarLinha && isTeFiv ? (
+                        <div className="flex flex-wrap items-center gap-1">
+                          {lotesEmbriao.length === 0 ? (
+                            <Link
+                              href={`/${localId}/reproducao/banco-genetico`}
+                              className="text-sm text-muted-foreground underline"
+                            >
+                              Cadastrar lote de embriões
+                            </Link>
+                          ) : (
+                            <Select
+                              value=""
+                              onValueChange={(loteId) => loteId && confirmarLinhaEmbriao(p.id, loteId)}
+                              items={lotesEmbriao.map((l) => ({
+                                value: l.id,
+                                label: `${l.doadoraIdentificacao} × ${l.touroIdentificacao} (${l.quantidade})`,
+                              }))}
+                            >
+                              <SelectTrigger className="h-8 w-56 text-sm">
+                                <SelectValue placeholder="Lote de embriões..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {lotesEmbriao.map((l) => (
+                                  <SelectItem key={l.id} value={l.id}>
+                                    {l.doadoraIdentificacao} × {l.touroIdentificacao} ({l.quantidade})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          <Input
+                            type="date"
+                            className="h-8 w-32"
+                            max={hojeISO}
+                            value={dataAcasalamentoPorLinha[p.id] ?? hojeISO}
+                            onChange={(e) =>
+                              setDataAcasalamentoPorLinha((atual) => ({ ...atual, [p.id]: e.target.value }))
+                            }
+                          />
                         </div>
                       ) : podeEditarLinha ? (
                         <div className="flex flex-wrap items-center gap-1">
@@ -430,7 +489,14 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
             </span>
           )}
           {podeConfirmarAcasalamento && (
-            <Button size="sm" onClick={() => setConfirmandoIds(selecionadosLista.map((p) => p.id))}>
+            <Button
+              size="sm"
+              onClick={() => {
+                const ids = selecionadosLista.map((p) => p.id);
+                if (isTeFiv) setConfirmandoEmbriaoIds(ids);
+                else setConfirmandoIds(ids);
+              }}
+            >
               Confirmar acasalamento ({selecionadosLista.length})
             </Button>
           )}
@@ -444,28 +510,17 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
 
       {podeEditar && (
         <>
-          {isTeFiv ? (
-            <DialogoAdicionarParticipantesEmbriao
-              localId={localId}
-              eventoId={evento.id}
-              especie={evento.especie}
-              candidatos={candidatos}
-              lotesEmbriao={lotesEmbriao}
-              jaParticipantes={jaParticipantes}
-              aberto={adicionandoAberto}
-              onFechar={() => setAdicionandoAberto(false)}
-            />
-          ) : (
-            <DialogoAdicionarParticipantes
-              localId={localId}
-              eventoId={evento.id}
-              especie={evento.especie}
-              candidatos={candidatos}
-              jaParticipantes={jaParticipantes}
-              aberto={adicionandoAberto}
-              onFechar={() => setAdicionandoAberto(false)}
-            />
-          )}
+          <DialogoAdicionarParticipantes
+            localId={localId}
+            eventoId={evento.id}
+            especie={evento.especie}
+            candidatos={candidatos}
+            jaParticipantes={jaParticipantes}
+            aberto={adicionandoAberto}
+            onFechar={() => setAdicionandoAberto(false)}
+            titulo={isTeFiv ? "Adicionar receptoras ao evento" : "Adicionar fêmeas ao evento"}
+            acao={isTeFiv ? adicionarReceptorasEvento : undefined}
+          />
           <DialogoConfirmarAcasalamento
             localId={localId}
             eventoId={evento.id}
@@ -476,6 +531,16 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
             coberturaIds={confirmandoIds}
             onFechar={() => {
               setConfirmandoIds(null);
+              setSelecionados(new Set());
+            }}
+          />
+          <DialogoConfirmarAcasalamentoEmbriao
+            localId={localId}
+            eventoId={evento.id}
+            lotesEmbriao={lotesEmbriao}
+            coberturaIds={confirmandoEmbriaoIds}
+            onFechar={() => {
+              setConfirmandoEmbriaoIds(null);
               setSelecionados(new Set());
             }}
           />

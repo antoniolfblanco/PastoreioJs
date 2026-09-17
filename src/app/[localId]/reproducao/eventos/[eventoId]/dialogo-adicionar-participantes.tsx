@@ -13,6 +13,8 @@ function identificacao(a: CandidatoAnimal) {
   return a.externo ? `${base} (externo)` : base;
 }
 
+type AcaoAdicionar = (localId: string, eventoId: string, ids: string[]) => Promise<unknown>;
+
 export function DialogoAdicionarParticipantes({
   localId,
   eventoId,
@@ -21,6 +23,9 @@ export function DialogoAdicionarParticipantes({
   jaParticipantes,
   aberto,
   onFechar,
+  titulo = "Adicionar fêmeas ao evento",
+  rotuloBotao = "Adicionar",
+  acao = adicionarParticipantesEvento,
 }: {
   localId: string;
   eventoId: string;
@@ -29,12 +34,18 @@ export function DialogoAdicionarParticipantes({
   jaParticipantes: Set<string>;
   aberto: boolean;
   onFechar: () => void;
+  titulo?: string;
+  rotuloBotao?: string;
+  // TE/FIV reusa este mesmo diálogo pra escolher as receptoras — só muda a
+  // RPC chamada (adicionar_receptoras_evento em vez de
+  // adicionar_participantes_evento), a lista/seleção é idêntica.
+  acao?: AcaoAdicionar;
 }) {
   return (
     <Dialog open={aberto} onOpenChange={(estaAberto) => !estaAberto && onFechar()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Adicionar fêmeas ao evento</DialogTitle>
+          <DialogTitle>{titulo}</DialogTitle>
         </DialogHeader>
         {/* Chave no conteúdo, nunca no DialogContent: remontar o Popup no
             meio da própria transição de fechamento fazia a janela "voltar"
@@ -47,6 +58,8 @@ export function DialogoAdicionarParticipantes({
           candidatos={candidatos}
           jaParticipantes={jaParticipantes}
           onFechar={onFechar}
+          rotuloBotao={rotuloBotao}
+          acao={acao}
         />
       </DialogContent>
     </Dialog>
@@ -60,6 +73,8 @@ function ConteudoAdicionarParticipantes({
   candidatos,
   jaParticipantes,
   onFechar,
+  rotuloBotao,
+  acao,
 }: {
   localId: string;
   eventoId: string;
@@ -67,6 +82,8 @@ function ConteudoAdicionarParticipantes({
   candidatos: CandidatoAnimal[];
   jaParticipantes: Set<string>;
   onFechar: () => void;
+  rotuloBotao: string;
+  acao: AcaoAdicionar;
 }) {
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
@@ -103,7 +120,7 @@ function ConteudoAdicionarParticipantes({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await adicionarParticipantesEvento(localId, eventoId, Array.from(selecionados));
+      await acao(localId, eventoId, Array.from(selecionados));
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível adicionar.");
@@ -137,7 +154,7 @@ function ConteudoAdicionarParticipantes({
       {erro && <p className="text-sm text-destructive">{erro}</p>}
       <DialogFooter>
         <Button type="button" disabled={emAndamento || selecionados.size === 0} onClick={confirmar}>
-          {emAndamento ? "Adicionando..." : `Adicionar (${selecionados.size})`}
+          {emAndamento ? "Adicionando..." : `${rotuloBotao} (${selecionados.size})`}
         </Button>
       </DialogFooter>
     </div>

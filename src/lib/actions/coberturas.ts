@@ -22,18 +22,31 @@ export async function adicionarParticipantesEvento(localId: string, eventoId: st
   revalidatePath(caminho(localId, eventoId));
 }
 
-// TE/FIV: participantes entram já confirmadas, com touro/doadora vindos do
-// lote de embriões escolhido — desconta a quantidade do lote na hora.
-export async function adicionarParticipantesEmbriao(
+// TE/FIV, etapa 1: só escolhe as receptoras — doadora/touro ficam em aberto
+// até "confirmar acasalamento" escolher o lote de embriões (mesma lógica de
+// pendência que adicionarParticipantesEvento usa pra IA/monta natural).
+export async function adicionarReceptorasEvento(localId: string, eventoId: string, receptoraIds: string[]) {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("adicionar_receptoras_evento", {
+    p_evento_id: eventoId,
+    p_receptora_ids: receptoraIds,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(caminho(localId, eventoId));
+}
+
+// TE/FIV, etapa 2: escolhe o lote de embriões (doadora × touro) pras
+// coberturas pendentes selecionadas — preenche femea_id/touro_id de uma vez
+// e desconta a quantidade do lote. Análogo ao confirmarAcasalamentos da IA.
+export async function confirmarAcasalamentoEmbriao(
   localId: string,
   eventoId: string,
-  params: { loteEmbriaoId: string; receptoraIds: string[]; data: string; responsavel: string | null },
+  params: { coberturaIds: string[]; loteEmbriaoId: string; data: string; responsavel: string | null },
 ) {
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.rpc("adicionar_participantes_embriao", {
-    p_evento_id: eventoId,
+  const { error } = await supabase.rpc("confirmar_acasalamento_embriao", {
+    p_cobertura_ids: params.coberturaIds,
     p_lote_embriao_id: params.loteEmbriaoId,
-    p_receptora_ids: params.receptoraIds,
     p_data: params.data,
     p_responsavel: params.responsavel,
   });
