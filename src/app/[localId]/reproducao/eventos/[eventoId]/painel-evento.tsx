@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, Plus, Trash2, X } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableHeader,
@@ -14,12 +15,30 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import { removerParticipante } from "@/lib/actions/coberturas";
+import { cn } from "@/lib/utils";
+import {
+  confirmarAcasalamentos,
+  desfazerAcasalamento,
+  registrarDiagnosticosGestacao,
+  removerParticipante,
+} from "@/lib/actions/coberturas";
+import { SeletorAnimalEvento } from "./seletor-animal-evento";
+import { DialogoAdicionarDosesSemen } from "./dialogo-adicionar-doses-semen";
 import { DialogoAdicionarParticipantes } from "./dialogo-adicionar-participantes";
 import { DialogoAdicionarParticipantesEmbriao } from "./dialogo-adicionar-participantes-embriao";
 import { DialogoConfirmarAcasalamento } from "./dialogo-confirmar-acasalamento";
 import { DialogoDiagnostico } from "./dialogo-diagnostico";
-import type { CandidatoAnimal, Evento, LoteEmbriaoOpcao, LoteRmOpcao, Participante } from "./page";
+import type {
+  CandidatoAnimal,
+  CertezaDiagnostico,
+  Evento,
+  LoteEmbriaoOpcao,
+  LoteRmOpcao,
+  Participante,
+  ResultadoDiagnostico,
+} from "./page";
+
+const hojeISO = new Date().toISOString().slice(0, 10);
 
 const rotulosMetodo: Record<Evento["metodo"], string> = {
   monta_natural: "Monta natural",
@@ -32,6 +51,17 @@ const rotulosDiagnostico: Record<string, string> = {
   vazia: "Vazia",
   inconclusivo: "Inconclusivo",
 };
+
+const resultados: { value: ResultadoDiagnostico; rotulo: string }[] = [
+  { value: "prenha", rotulo: "Prenha" },
+  { value: "vazia", rotulo: "Vazia" },
+  { value: "inconclusivo", rotulo: "Inconclusivo" },
+];
+
+const certezas: { value: CertezaDiagnostico; rotulo: string }[] = [
+  { value: "certo", rotulo: "Certo" },
+  { value: "provavel", rotulo: "Provável" },
+];
 
 function formatarData(data: string | null) {
   return data ? new Date(data + "T00:00:00").toLocaleDateString("pt-BR") : "—";
@@ -69,6 +99,7 @@ type Props = {
 
 export function PainelEvento({ localId, evento, participantes, candidatos, lotesRm, lotesEmbriao, podeEditar }: Props) {
   const isTeFiv = evento.metodo === "te_fiv";
+  const isIa = evento.metodo === "inseminacao_artificial";
   const resumo = useMemo(() => resumoDeParticipantes(participantes), [participantes]);
   const jaParticipantes = useMemo(() => new Set(participantes.map((p) => p.femeaId)), [participantes]);
 
@@ -77,6 +108,10 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
   const [confirmandoIds, setConfirmandoIds] = useState<string[] | null>(null);
   const [diagnosticando, setDiagnosticando] = useState<Participante[] | null>(null);
   const [removendoId, setRemovendoId] = useState<string | null>(null);
+  const [linhaEmAndamento, setLinhaEmAndamento] = useState<string | null>(null);
+  const [dosesRapidoAberto, setDosesRapidoAberto] = useState(false);
+  const [dataAcasalamentoPorLinha, setDataAcasalamentoPorLinha] = useState<Record<string, string>>({});
+  const [dataDiagnosticoPorLinha, setDataDiagnosticoPorLinha] = useState<Record<string, string>>({});
 
   const selecionadosLista = useMemo(
     () => participantes.filter((p) => selecionados.has(p.id)),
@@ -119,6 +154,55 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
     }
   }
 
+  async function confirmarLinha(participanteId: string, touroId: string) {
+    setLinhaEmAndamento(participanteId);
+    try {
+      await confirmarAcasalamentos(localId, evento.id, {
+        coberturaIds: [participanteId],
+        touroId,
+        rmLoteId: null,
+        data: dataAcasalamentoPorLinha[participanteId] || hojeISO,
+        responsavel: null,
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível confirmar.");
+    } finally {
+      setLinhaEmAndamento(null);
+    }
+  }
+
+  async function desfazerLinha(participanteId: string) {
+    if (!confirm("Desfazer este acasalamento e voltar pra pendente?")) return;
+    setLinhaEmAndamento(participanteId);
+    try {
+      await desfazerAcasalamento(localId, evento.id, participanteId);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível desfazer.");
+    } finally {
+      setLinhaEmAndamento(null);
+    }
+  }
+
+  async function marcarDiagnosticoLinha(
+    participanteId: string,
+    resultado: ResultadoDiagnostico,
+    certeza: CertezaDiagnostico | null,
+  ) {
+    setLinhaEmAndamento(participanteId);
+    try {
+      await registrarDiagnosticosGestacao(localId, evento.id, {
+        resultados: [{ coberturaId: participanteId, resultado, certeza }],
+        data: dataDiagnosticoPorLinha[participanteId] || hojeISO,
+        responsavel: null,
+        observacoes: null,
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível registrar.");
+    } finally {
+      setLinhaEmAndamento(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -153,6 +237,12 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
             <Plus className="size-4" />
             {isTeFiv ? "Adicionar receptoras" : "Adicionar participantes"}
           </Button>
+          {isIa && (
+            <Button variant="outline" size="sm" onClick={() => setDosesRapidoAberto(true)}>
+              <Plus className="size-4" />
+              Adicionar doses de sêmen
+            </Button>
+          )}
         </div>
       )}
 
@@ -182,46 +272,150 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
               </TableRow>
             </TableHeader>
             <TableBody>
-              {participantes.map((p) => (
-                <TableRow key={p.id} data-selecionado={selecionados.has(p.id) || undefined}>
-                  {podeEditar && (
-                    <TableCell>
-                      <Checkbox checked={selecionados.has(p.id)} onCheckedChange={() => alternarSelecao(p.id)} />
-                    </TableCell>
-                  )}
-                  <TableCell className="font-medium">{p.identificacao}</TableCell>
-                  <TableCell>{p.touroNome ?? p.rmLoteNome ?? (p.confirmada ? "—" : "Pendente")}</TableCell>
-                  <TableCell>{formatarData(p.data)}</TableCell>
-                  <TableCell>{formatarData(p.ultimoDiagnosticoData)}</TableCell>
-                  <TableCell>
-                    {p.pariu ? (
-                      <Badge variant="secondary">Pariu</Badge>
-                    ) : p.ultimoDiagnosticoResultado ? (
-                      <Badge variant={p.ultimoDiagnosticoResultado === "prenha" ? "secondary" : "outline"}>
-                        {rotulosDiagnostico[p.ultimoDiagnosticoResultado]}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
+              {participantes.map((p) => {
+                const podeEditarLinha = podeEditar && linhaEmAndamento !== p.id;
+                const podeDesfazer =
+                  podeEditar && !isTeFiv && p.confirmada && !p.pariu && !p.ultimoDiagnosticoResultado;
+                return (
+                  <TableRow key={p.id} data-selecionado={selecionados.has(p.id) || undefined}>
+                    {podeEditar && (
+                      <TableCell>
+                        <Checkbox checked={selecionados.has(p.id)} onCheckedChange={() => alternarSelecao(p.id)} />
+                      </TableCell>
                     )}
-                  </TableCell>
-                  {podeEditar && (
+                    <TableCell className="font-medium">{p.identificacao}</TableCell>
                     <TableCell>
-                      {!p.confirmada && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 text-destructive"
-                          title="Remover"
-                          disabled={removendoId === p.id}
-                          onClick={() => remover(p.id)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                      {isTeFiv || p.confirmada ? (
+                        <div className="flex items-center gap-1">
+                          <span>{p.touroNome ?? p.rmLoteNome ?? "—"}</span>
+                          {podeDesfazer && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-6 text-destructive"
+                              title="Desfazer acasalamento"
+                              disabled={linhaEmAndamento === p.id}
+                              onClick={() => desfazerLinha(p.id)}
+                            >
+                              <X className="size-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ) : podeEditarLinha ? (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <SeletorAnimalEvento
+                            htmlId={`touro-${p.id}`}
+                            rotulo="Touro"
+                            compacto
+                            sexo="macho"
+                            especie={evento.especie}
+                            candidatos={candidatos}
+                            value=""
+                            onValueChange={(touroId) => touroId && confirmarLinha(p.id, touroId)}
+                          />
+                          <Input
+                            type="date"
+                            className="h-8 w-32"
+                            max={hojeISO}
+                            value={dataAcasalamentoPorLinha[p.id] ?? hojeISO}
+                            onChange={(e) =>
+                              setDataAcasalamentoPorLinha((atual) => ({ ...atual, [p.id]: e.target.value }))
+                            }
+                          />
+                        </div>
+                      ) : (
+                        "Pendente"
                       )}
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                    <TableCell>{formatarData(p.data)}</TableCell>
+                    <TableCell>{formatarData(p.ultimoDiagnosticoData)}</TableCell>
+                    <TableCell>
+                      {p.pariu ? (
+                        <Badge variant="secondary">Pariu</Badge>
+                      ) : !p.confirmada ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : podeEditarLinha ? (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex flex-wrap gap-1">
+                            {resultados.map((r) => (
+                              <button
+                                key={r.value}
+                                type="button"
+                                onClick={() =>
+                                  marcarDiagnosticoLinha(
+                                    p.id,
+                                    r.value,
+                                    r.value === "prenha" ? (p.ultimoDiagnosticoCerteza ?? "provavel") : null,
+                                  )
+                                }
+                                className={cn(
+                                  buttonVariants({
+                                    variant: p.ultimoDiagnosticoResultado === r.value ? "secondary" : "outline",
+                                    size: "xs",
+                                  }),
+                                )}
+                              >
+                                {r.rotulo}
+                              </button>
+                            ))}
+                          </div>
+                          {p.ultimoDiagnosticoResultado === "prenha" && (
+                            <div className="flex flex-wrap gap-1">
+                              {certezas.map((c) => (
+                                <button
+                                  key={c.value}
+                                  type="button"
+                                  onClick={() => marcarDiagnosticoLinha(p.id, "prenha", c.value)}
+                                  className={cn(
+                                    buttonVariants({
+                                      variant: p.ultimoDiagnosticoCerteza === c.value ? "secondary" : "outline",
+                                      size: "xs",
+                                    }),
+                                  )}
+                                >
+                                  {c.rotulo}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <Input
+                            type="date"
+                            className="h-7 w-32 text-xs"
+                            max={hojeISO}
+                            placeholder="Hoje"
+                            value={dataDiagnosticoPorLinha[p.id] ?? ""}
+                            onChange={(e) =>
+                              setDataDiagnosticoPorLinha((atual) => ({ ...atual, [p.id]: e.target.value }))
+                            }
+                          />
+                        </div>
+                      ) : p.ultimoDiagnosticoResultado ? (
+                        <Badge variant={p.ultimoDiagnosticoResultado === "prenha" ? "secondary" : "outline"}>
+                          {rotulosDiagnostico[p.ultimoDiagnosticoResultado]}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    {podeEditar && (
+                      <TableCell>
+                        {!p.confirmada && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-destructive"
+                            title="Remover"
+                            disabled={removendoId === p.id}
+                            onClick={() => remover(p.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -294,6 +488,15 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
               setSelecionados(new Set());
             }}
           />
+          {isIa && (
+            <DialogoAdicionarDosesSemen
+              localId={localId}
+              especie={evento.especie}
+              candidatos={candidatos}
+              aberto={dosesRapidoAberto}
+              onFechar={() => setDosesRapidoAberto(false)}
+            />
+          )}
         </>
       )}
     </div>

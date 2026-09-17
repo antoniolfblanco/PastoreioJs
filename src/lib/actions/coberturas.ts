@@ -70,6 +70,16 @@ export async function confirmarAcasalamentos(
   revalidatePath(caminho(localId, eventoId));
 }
 
+// Reverte uma confirmação (volta pra "pendente"). A RPC recusa se já tiver
+// diagnóstico ou nascido registrado, e devolve a dose de sêmen se o método
+// for inseminação artificial.
+export async function desfazerAcasalamento(localId: string, eventoId: string, coberturaId: string) {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("desfazer_confirmacao_acasalamento", { p_cobertura_id: coberturaId });
+  if (error) throw new Error(error.message);
+  revalidatePath(caminho(localId, eventoId));
+}
+
 export async function registrarDiagnosticosGestacao(
   localId: string,
   eventoId: string,

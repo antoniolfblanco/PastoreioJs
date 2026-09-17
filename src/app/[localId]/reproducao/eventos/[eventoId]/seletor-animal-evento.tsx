@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { CandidatoAnimal, Especie, Sexo } from "./page";
 
 function identificacaoCandidato(a: CandidatoAnimal) {
@@ -21,6 +22,7 @@ export function SeletorAnimalEvento({
   candidatos,
   value,
   onValueChange,
+  compacto = false,
 }: {
   htmlId: string;
   rotulo: string;
@@ -29,6 +31,9 @@ export function SeletorAnimalEvento({
   candidatos: CandidatoAnimal[];
   value: string;
   onValueChange: (id: string) => void;
+  // Usado nas células da tabela do evento: mesmo campo, sem o <Label> e mais
+  // baixo, pra caber numa linha ao lado da data e do atalho de doses.
+  compacto?: boolean;
 }) {
   const disponiveis = useMemo(
     () => candidatos.filter((a) => a.sexo === sexo && a.especie === especie),
@@ -74,15 +79,15 @@ export function SeletorAnimalEvento({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={htmlId}>{rotulo}</Label>
-      <div className="relative w-full">
+    <div className={cn("flex flex-col gap-2", compacto && "gap-0")}>
+      {!compacto && <Label htmlFor={htmlId}>{rotulo}</Label>}
+      <div className={cn("relative w-full", compacto && "min-w-40")}>
         <Input
           id={htmlId}
           value={texto}
           autoComplete="off"
-          placeholder="Buscar por nome, brinco ou tatuagem..."
-          className="pr-8"
+          placeholder={compacto ? "Buscar touro..." : "Buscar por nome, brinco ou tatuagem..."}
+          className={cn("pr-8", compacto && "h-8 text-sm")}
           onChange={(e) => {
             setTexto(e.target.value);
             setSugestoesAbertas(true);

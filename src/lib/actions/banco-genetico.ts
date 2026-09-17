@@ -34,6 +34,26 @@ export async function adicionarDosesSemen(
   return {};
 }
 
+// Variante de chamada direta (sem FormData/useActionState) pra atalhos
+// embutidos em outras telas, ex.: confirmar acasalamento sem sair pra
+// cadastrar dose primeiro.
+export async function adicionarDosesSemenDireto(
+  localId: string,
+  touroId: string,
+  quantidade: number,
+  observacoes: string | null,
+) {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("adicionar_doses_semen", {
+    p_local_id: localId,
+    p_touro_id: touroId,
+    p_quantidade: quantidade,
+    p_observacoes: observacoes,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(caminho(localId));
+}
+
 export async function removerDosesSemen(localId: string, touroId: string, quantidade: number) {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("remover_doses_semen", {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { cn } from "@/lib/utils";
 import { confirmarAcasalamentos } from "@/lib/actions/coberturas";
 import { SeletorAnimalEvento } from "./seletor-animal-evento";
+import { DialogoAdicionarDosesSemen } from "./dialogo-adicionar-doses-semen";
 import type { CandidatoAnimal, Especie, LoteRmOpcao, Metodo } from "./page";
 
 const hojeISO = new Date().toISOString().slice(0, 10);
@@ -93,6 +95,7 @@ function ConteudoConfirmarAcasalamento({
   const [responsavel, setResponsavel] = useState("");
   const [emAndamento, setEmAndamento] = useState(false);
   const [erro, setErro] = useState<string | undefined>();
+  const [dosesRapidoAberto, setDosesRapidoAberto] = useState(false);
 
   async function confirmar() {
     if (!usarLoteRm && !touroId) {
@@ -143,15 +146,30 @@ function ConteudoConfirmarAcasalamento({
       )}
 
       {!usarLoteRm ? (
-        <SeletorAnimalEvento
-          htmlId="touroAcasalamento"
-          rotulo={ia ? "Touro (banco de sêmen)" : "Touro"}
-          sexo="macho"
-          especie={especie}
-          candidatos={candidatos}
-          value={touroId}
-          onValueChange={setTouroId}
-        />
+        <div className="flex items-end gap-1">
+          <div className="flex-1">
+            <SeletorAnimalEvento
+              htmlId="touroAcasalamento"
+              rotulo={ia ? "Touro (banco de sêmen)" : "Touro"}
+              sexo="macho"
+              especie={especie}
+              candidatos={candidatos}
+              value={touroId}
+              onValueChange={setTouroId}
+            />
+          </div>
+          {ia && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              title="Adicionar doses de sêmen"
+              onClick={() => setDosesRapidoAberto(true)}
+            >
+              <Plus className="size-4" />
+            </Button>
+          )}
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
           <Label htmlFor="loteRmAcasalamento">Lote RM</Label>
@@ -200,6 +218,16 @@ function ConteudoConfirmarAcasalamento({
           {emAndamento ? "Confirmando..." : "Confirmar"}
         </Button>
       </DialogFooter>
+
+      {ia && (
+        <DialogoAdicionarDosesSemen
+          localId={localId}
+          especie={especie}
+          candidatos={candidatos}
+          aberto={dosesRapidoAberto}
+          onFechar={() => setDosesRapidoAberto(false)}
+        />
+      )}
     </div>
   );
 }
