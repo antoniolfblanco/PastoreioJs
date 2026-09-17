@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2, CalendarClock, Repeat } from "lucide-react";
+import { Plus, Trash2, Pencil, CalendarClock, Repeat, ChevronDown, ChevronRight } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableHeader,
   TableBody,
-  TableFooter,
   TableHead,
   TableRow,
   TableCell,
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { apagarEventoReprodutivo, buscarResumoEventoParaExclusao } from "@/lib/actions/eventos-reprodutivos";
 import { DialogoApagarReprodutivo, type ResumoExclusaoReprodutiva } from "../_componentes/dialogo-apagar-reprodutivo";
 import { DialogoEvento, type EventoParaEditar } from "./dialogo-evento";
-import type { Especie, Estacao, Evento, Metodo } from "./page";
+import type { Especie, Estacao, Evento, FemeaDoEvento, Metodo } from "./page";
 
 const especies: { value: Especie; rotulo: string }[] = [
   { value: "bovino", rotulo: "Bovinos" },
@@ -31,36 +31,88 @@ const rotulosMetodo: Record<Metodo, string> = {
   te_fiv: "TE/FIV",
 };
 
-function formatarData(data: string) {
-  return new Date(data + "T00:00:00").toLocaleDateString("pt-BR");
+const rotulosDiagnostico: Record<string, string> = {
+  prenha: "Prenha",
+  vazia: "Vazia",
+  inconclusivo: "Inconclusivo",
+};
+
+function formatarData(data: string | null) {
+  return data ? new Date(data + "T00:00:00").toLocaleDateString("pt-BR") : "—";
+}
+
+function formatarPercentual(parte: number, total: number) {
+  if (total === 0) return "—";
+  return `${Math.round((parte / total) * 100)}%`;
+}
+
+function resumoDeFemeas(femeas: FemeaDoEvento[]) {
+  let diagnosticadas = 0;
+  let prenhes = 0;
+  let vazias = 0;
+  let inconclusivos = 0;
+  for (const f of femeas) {
+    if (!f.ultimoDiagnosticoResultado) continue;
+    diagnosticadas++;
+    if (f.ultimoDiagnosticoResultado === "prenha") prenhes++;
+    else if (f.ultimoDiagnosticoResultado === "vazia") vazias++;
+    else if (f.ultimoDiagnosticoResultado === "inconclusivo") inconclusivos++;
+  }
+  return { total: femeas.length, diagnosticadas, prenhes, vazias, inconclusivos };
 }
 
 type Props = {
   localId: string;
   estacoes: Estacao[];
   eventos: Evento[];
+  femeasPorEvento: Record<string, FemeaDoEvento[]>;
   podeEditar: boolean;
+  estacaoInicialId?: string;
 };
 
-export function ListaEventos({ localId, estacoes, eventos, podeEditar }: Props) {
-  const [especieSelecionada, setEspecieSelecionada] = useState<Especie>("bovino");
+export function ListaEventos({ localId, estacoes, eventos, femeasPorEvento, podeEditar, estacaoInicialId }: Props) {
+  const estacaoLinkada = useMemo(
+    () => (estacaoInicialId ? (estacoes.find((e) => e.id === estacaoInicialId) ?? null) : null),
+    [estacoes, estacaoInicialId],
+  );
+  const [especieSelecionada, setEspecieSelecionada] = useState<Especie>(estacaoLinkada?.especie ?? "bovino");
+  // Enquanto não nulo, mostra essa estação específica (mesmo encerrada) em
+  // vez da estação ativa da espécie — é o que o link do card de Estação
+  // Reprodutiva usa pra abrir aqui já filtrado.
+  const [estacaoFixadaId, setEstacaoFixadaId] = useState<string | null>(estacaoInicialId ?? null);
   const [alvo, setAlvo] = useState<EventoParaEditar | "novo" | null>(null);
   const [carregandoId, setCarregandoId] = useState<string | null>(null);
   const [apagando, setApagando] = useState<{ evento: Evento; resumo: ResumoExclusaoReprodutiva } | null>(null);
   const [apagandoEmAndamento, setApagandoEmAndamento] = useState(false);
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
 
-  const estacaoAtiva = useMemo(
-    () =>
+  function trocarEspecie(nova: Especie) {
+    setEspecieSelecionada(nova);
+    setEstacaoFixadaId(null);
+  }
+
+  const estacaoAtiva = useMemo(() => {
+    if (estacaoFixadaId) return estacoes.find((e) => e.id === estacaoFixadaId) ?? null;
+    return (
       estacoes.find((e) => e.ativo && e.especie === especieSelecionada) ??
       estacoes.find((e) => e.ativo && e.especie === null) ??
-      null,
-    [estacoes, especieSelecionada],
-  );
+      null
+    );
+  }, [estacoes, especieSelecionada, estacaoFixadaId]);
 
   const eventosDaEstacao = useMemo(
     () => (estacaoAtiva ? eventos.filter((ev) => ev.estacao_id === estacaoAtiva.id) : []),
     [eventos, estacaoAtiva],
   );
+
+  function alternarExpandido(id: string) {
+    setExpandidos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  }
 
   async function abrirEdicao(evento: Evento) {
     setCarregandoId(evento.id);
@@ -106,14 +158,14 @@ export function ListaEventos({ localId, estacoes, eventos, podeEditar }: Props) 
           <h1 className="text-xl font-semibold">Eventos Reprodutivos</h1>
           <p className="text-sm text-muted-foreground">
             Cada evento (ex.: &quot;IATF Lote 1&quot;) agrupa as fêmeas que vão participar da mesma rodada de
-            cobertura.
+            cobertura — clique no nome pra gerenciar as participantes.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1">
           {especies.map((e) => (
             <button
               key={e.value}
-              onClick={() => setEspecieSelecionada(e.value)}
+              onClick={() => trocarEspecie(e.value)}
               className={cn(
                 buttonVariants({ variant: especieSelecionada === e.value ? "secondary" : "ghost", size: "sm" }),
               )}
@@ -139,7 +191,9 @@ export function ListaEventos({ localId, estacoes, eventos, podeEditar }: Props) 
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
-              Estação ativa: <span className="font-medium text-foreground">{estacaoAtiva.nome}</span>
+              {estacaoFixadaId ? "Estação" : "Estação ativa"}:{" "}
+              <span className="font-medium text-foreground">{estacaoAtiva.nome}</span>
+              {estacaoFixadaId && !estacaoAtiva.ativo && " (encerrada)"}
             </p>
             {podeEditar && (
               <Button size="sm" onClick={() => setAlvo("novo")}>
@@ -159,51 +213,111 @@ export function ListaEventos({ localId, estacoes, eventos, podeEditar }: Props) 
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Método</TableHead>
-                  <TableHead>Início</TableHead>
-                  {podeEditar && <TableHead className="w-10" />}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {eventosDaEstacao.map((ev) => (
-                  <TableRow
-                    key={ev.id}
-                    className={podeEditar ? "cursor-pointer" : undefined}
-                    onClick={() => podeEditar && carregandoId === null && abrirEdicao(ev)}
-                  >
-                    <TableCell className="font-medium">{ev.nome}</TableCell>
-                    <TableCell>{rotulosMetodo[ev.metodo]}</TableCell>
-                    <TableCell>{formatarData(ev.data_inicio)}</TableCell>
-                    {podeEditar && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 text-destructive"
-                          title="Apagar"
-                          disabled={carregandoId === ev.id}
-                          onClick={() => abrirExclusao(ev)}
+            <div className="flex flex-col gap-3">
+              {eventosDaEstacao.map((ev) => {
+                const femeas = femeasPorEvento[ev.id] ?? [];
+                const resumo = resumoDeFemeas(femeas);
+                const isTeFiv = ev.metodo === "te_fiv";
+                const expandido = expandidos.has(ev.id);
+                return (
+                  <div key={ev.id} className="rounded-lg border p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <Link
+                          href={`/${localId}/reproducao/eventos/${ev.id}`}
+                          className="font-medium hover:underline"
                         >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </TableCell>
+                          {ev.nome}
+                        </Link>
+                        <p className="text-sm text-muted-foreground">
+                          {rotulosMetodo[ev.metodo]} — início em {formatarData(ev.data_inicio)}
+                        </p>
+                      </div>
+                      {podeEditar && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            title="Editar"
+                            disabled={carregandoId === ev.id}
+                            onClick={() => abrirEdicao(ev)}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-destructive"
+                            title="Apagar"
+                            disabled={carregandoId === ev.id}
+                            onClick={() => abrirExclusao(ev)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t pt-3 text-sm text-muted-foreground">
+                      <span>{isTeFiv ? `Embriões transferidos: ${resumo.total}` : `Vacas acasaladas: ${resumo.total}`}</span>
+                      <span>
+                        Diagnosticadas: {resumo.diagnosticadas} ({formatarPercentual(resumo.diagnosticadas, resumo.total)})
+                      </span>
+                      <span>Prenhes: {resumo.prenhes}</span>
+                      <span>Vazias: {resumo.vazias}</span>
+                      <span>Inconclusivos: {resumo.inconclusivos}</span>
+                    </div>
+
+                    {femeas.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => alternarExpandido(ev.id)}
+                        className="mt-2 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        {expandido ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                        {expandido ? "Ocultar fêmeas" : "Ver fêmeas"}
+                      </button>
                     )}
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={3} className="text-sm font-normal text-muted-foreground">
-                    {eventosDaEstacao.length} {eventosDaEstacao.length === 1 ? "evento" : "eventos"}
-                  </TableCell>
-                  {podeEditar && <TableCell />}
-                </TableRow>
-              </TableFooter>
-            </Table>
+
+                    {expandido && femeas.length > 0 && (
+                      <Table className="mt-2">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fêmea</TableHead>
+                            <TableHead>{isTeFiv ? "Embrião" : "Acasalamento"}</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead>Data diagnóstico</TableHead>
+                            <TableHead>Diagnóstico</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {femeas.map((f) => (
+                            <TableRow key={f.id}>
+                              <TableCell className="font-medium">{f.identificacao}</TableCell>
+                              <TableCell>{f.acasalamento ?? (f.confirmada ? "—" : "Pendente")}</TableCell>
+                              <TableCell>{formatarData(f.data)}</TableCell>
+                              <TableCell>{formatarData(f.ultimoDiagnosticoData)}</TableCell>
+                              <TableCell>
+                                {f.pariu ? (
+                                  <Badge variant="secondary">Pariu</Badge>
+                                ) : f.ultimoDiagnosticoResultado ? (
+                                  <Badge variant={f.ultimoDiagnosticoResultado === "prenha" ? "secondary" : "outline"}>
+                                    {rotulosDiagnostico[f.ultimoDiagnosticoResultado]}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </>
       )}
