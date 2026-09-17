@@ -24,6 +24,7 @@ export type Participante = {
   femeaId: string;
   identificacao: string;
   confirmada: boolean;
+  doadoraNome: string | null;
   touroNome: string | null;
   rmLoteNome: string | null;
   data: string;
@@ -108,7 +109,13 @@ export default async function EventoReprodutivoDetalhePage({
         "id, femea_id, femea_nome, femea_brinco, femea_tatuagem, receptora_id, receptora_nome, receptora_brinco, receptora_tatuagem, touro_nome, rm_lote_nome, confirmada, data, responsavel, ultimo_diagnostico_resultado, ultimo_diagnostico_certeza, ultimo_diagnostico_data, pariu",
       )
       .eq("evento_id", eventoId)
-      .order("criado_em", { ascending: false }),
+      // "id" como critério de desempate: coberturas do mesmo lote nascem
+      // com o mesmo criado_em (mesma instrução INSERT...SELECT), e sem uma
+      // segunda coluna de ordenação o Postgres pode devolver empates em
+      // ordem diferente a cada consulta — a linha confirmada "pulava" pra
+      // outra posição na tabela a cada UPDATE.
+      .order("criado_em", { ascending: false })
+      .order("id", { ascending: true }),
     supabase.from("lotes_rm").select("id, nome").eq("local_id", localId).eq("ativo", true).order("nome"),
     supabase
       .from("banco_embrioes")
@@ -151,6 +158,9 @@ export default async function EventoReprodutivoDetalhePage({
       femeaId: sujeito.id,
       identificacao: identificacao(sujeito),
       confirmada: c.confirmada,
+      doadoraNome: c.femea_id
+        ? identificacao({ nome: c.femea_nome, brinco: c.femea_brinco, tatuagem: c.femea_tatuagem })
+        : null,
       touroNome: c.touro_nome,
       rmLoteNome: c.rm_lote_nome,
       data: c.data,

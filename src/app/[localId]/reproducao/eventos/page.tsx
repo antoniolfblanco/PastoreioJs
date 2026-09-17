@@ -65,9 +65,14 @@ export default async function EventosReprodutivosPage({
     supabase
       .from("coberturas_detalhe")
       .select(
-        "id, evento_id, receptora_id, receptora_nome, receptora_brinco, receptora_tatuagem, femea_id, femea_nome, femea_brinco, femea_tatuagem, touro_nome, rm_lote_nome, confirmada, data, ultimo_diagnostico_resultado, ultimo_diagnostico_data, pariu",
+        "id, evento_id, evento_metodo, receptora_id, receptora_nome, receptora_brinco, receptora_tatuagem, femea_id, femea_nome, femea_brinco, femea_tatuagem, touro_nome, rm_lote_nome, confirmada, data, ultimo_diagnostico_resultado, ultimo_diagnostico_data, pariu",
       )
-      .eq("local_id", localId),
+      .eq("local_id", localId)
+      // "id" como desempate: coberturas do mesmo lote têm o mesmo
+      // criado_em (mesma instrução INSERT...SELECT); sem isso, confirmar
+      // uma linha fazia ela "pular" de posição na tabela expandida.
+      .order("criado_em", { ascending: false })
+      .order("id", { ascending: true }),
   ]);
 
   if (erroEstacoes || erroEventos || erroCoberturas) {
@@ -87,7 +92,12 @@ export default async function EventosReprodutivosPage({
     lista.push({
       id: c.id,
       identificacao: identificacao(sujeito),
-      acasalamento: c.touro_nome ?? c.rm_lote_nome ?? null,
+      acasalamento:
+        c.evento_metodo === "te_fiv"
+          ? c.touro_nome
+            ? `${identificacao({ nome: c.femea_nome, brinco: c.femea_brinco, tatuagem: c.femea_tatuagem })} × ${c.touro_nome}`
+            : null
+          : (c.touro_nome ?? c.rm_lote_nome ?? null),
       confirmada: c.confirmada,
       data: c.data,
       ultimoDiagnosticoResultado: c.ultimo_diagnostico_resultado as ResultadoDiagnostico | null,

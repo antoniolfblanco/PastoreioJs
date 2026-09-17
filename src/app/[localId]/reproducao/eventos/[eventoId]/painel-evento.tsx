@@ -306,7 +306,13 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
                     <TableCell>
                       {p.confirmada ? (
                         <div className="flex items-center gap-1">
-                          <span>{p.touroNome ?? p.rmLoteNome ?? "—"}</span>
+                          <span>
+                            {isTeFiv
+                              ? p.touroNome
+                                ? `${p.doadoraNome ?? "—"} × ${p.touroNome}`
+                                : "—"
+                              : (p.touroNome ?? p.rmLoteNome ?? "—")}
+                          </span>
                           {podeDesfazer && (
                             <Button
                               variant="ghost"
