@@ -27,14 +27,6 @@ export type AnimalDaVenda = {
   a_rendimento: boolean;
   valor_venda_previsto: number | null;
   valor_venda_definitivo: number | null;
-  venda_paga: boolean;
-  venda_data_pagamento: string | null;
-  venda_entregue: boolean;
-  venda_data_entrega: string | null;
-  venda_contrato_assinado: boolean;
-  venda_data_contrato_assinado: string | null;
-  venda_posse_transferida: boolean;
-  venda_data_posse_transferida: string | null;
 };
 
 export type Venda = {
@@ -47,7 +39,6 @@ export type Venda = {
   responsavel: string | null;
   observacoes: string | null;
   criado_em: string;
-  cobranca_grupo_id: string | null;
   animais: AnimalDaVenda[];
 };
 
@@ -102,9 +93,7 @@ export default async function VendasPage({
     buscarAnimaisAtivos(supabase, localId),
     supabase
       .from("vendas")
-      .select(
-        "id, data, descricao, comprador, prazo_recebimento, recebido, responsavel, observacoes, criado_em, cobranca_grupo_id",
-      )
+      .select("id, data, descricao, comprador, prazo_recebimento, recebido, responsavel, observacoes, criado_em")
       .eq("local_id", localId)
       .order("criado_em", { ascending: false }),
   ]);
@@ -126,10 +115,7 @@ export default async function VendasPage({
     ? await supabase
         .from("animais")
         .select(
-          `id, nome, brinco, tatuagem, venda_id, peso_venda, a_rendimento, valor_venda_previsto, valor_venda_definitivo,
-           venda_paga, venda_data_pagamento, venda_entregue, venda_data_entrega,
-           venda_contrato_assinado, venda_data_contrato_assinado, venda_posse_transferida, venda_data_posse_transferida,
-           categorias!categoria_id(descricao)`,
+          "id, nome, brinco, tatuagem, venda_id, peso_venda, a_rendimento, valor_venda_previsto, valor_venda_definitivo, categorias!categoria_id(descricao)",
         )
         .in("venda_id", idsVendas)
     : { data: [] as Record<string, unknown>[], error: null };
@@ -150,14 +136,6 @@ export default async function VendasPage({
       a_rendimento: a.a_rendimento as boolean,
       valor_venda_previsto: a.valor_venda_previsto as number | null,
       valor_venda_definitivo: a.valor_venda_definitivo as number | null,
-      venda_paga: a.venda_paga as boolean,
-      venda_data_pagamento: a.venda_data_pagamento as string | null,
-      venda_entregue: a.venda_entregue as boolean,
-      venda_data_entrega: a.venda_data_entrega as string | null,
-      venda_contrato_assinado: a.venda_contrato_assinado as boolean,
-      venda_data_contrato_assinado: a.venda_data_contrato_assinado as string | null,
-      venda_posse_transferida: a.venda_posse_transferida as boolean,
-      venda_data_posse_transferida: a.venda_data_posse_transferida as string | null,
     });
     animaisPorVenda.set(a.venda_id as string, lista);
   }
@@ -172,7 +150,6 @@ export default async function VendasPage({
     responsavel: v.responsavel,
     observacoes: v.observacoes,
     criado_em: v.criado_em,
-    cobranca_grupo_id: v.cobranca_grupo_id,
     animais: animaisPorVenda.get(v.id) ?? [],
   }));
 
