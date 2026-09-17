@@ -6,6 +6,7 @@ export type Especie = "bovino" | "ovino" | "equino";
 export type Sexo = "macho" | "femea" | "desconhecido";
 
 export type TouroComEstoque = {
+  id: string;
   touro_id: string;
   identificacao: string;
   especie: Especie;
@@ -117,6 +118,7 @@ export default async function BancoGeneticoPage({
         | null,
     );
     return {
+      id: s.id,
       touro_id: s.touro_id,
       identificacao: identificacao(touro),
       especie: touro?.especie ?? "bovino",

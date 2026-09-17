@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Droplet, FlaskConical, Trash2, Plus } from "lucide-react";
+import { Droplet, FlaskConical, Trash2, Plus, Pencil } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,8 +16,10 @@ import {
 import { cn } from "@/lib/utils";
 import { apagarLoteEmbrioes } from "@/lib/actions/banco-genetico";
 import { DialogoAdicionarDoses } from "./dialogo-adicionar-doses";
+import { DialogoEditarDoses } from "./dialogo-editar-doses";
 import { DialogoRemoverDoses } from "./dialogo-remover-doses";
 import { DialogoNovoLoteEmbrioes } from "./dialogo-novo-lote-embrioes";
+import { DialogoEditarLoteEmbrioes } from "./dialogo-editar-lote-embrioes";
 import type { CandidatoGenetico, Especie, LoteEmbriao, TouroComEstoque } from "./page";
 
 const especies: { value: Especie; rotulo: string }[] = [
@@ -41,8 +43,10 @@ type Props = {
 export function PainelBancoGenetico({ localId, semen, embrioes, candidatos, podeEditar }: Props) {
   const [especieSelecionada, setEspecieSelecionada] = useState<Especie>("bovino");
   const [adicionarDosesAberto, setAdicionarDosesAberto] = useState(false);
+  const [editandoDoses, setEditandoDoses] = useState<TouroComEstoque | null>(null);
   const [touroRemovendo, setTouroRemovendo] = useState<TouroComEstoque | null>(null);
   const [novoLoteAberto, setNovoLoteAberto] = useState(false);
+  const [editandoLote, setEditandoLote] = useState<LoteEmbriao | null>(null);
 
   const semenDaEspecie = useMemo(() => semen.filter((s) => s.especie === especieSelecionada), [semen, especieSelecionada]);
   const embrioesDaEspecie = useMemo(
@@ -111,12 +115,12 @@ export function PainelBancoGenetico({ localId, semen, embrioes, candidatos, pode
               <TableRow>
                 <TableHead>Touro</TableHead>
                 <TableHead className="text-right">Doses</TableHead>
-                {podeEditar && <TableHead className="w-10" />}
+                {podeEditar && <TableHead className="w-20" />}
               </TableRow>
             </TableHeader>
             <TableBody>
               {semenDaEspecie.map((s) => (
-                <TableRow key={s.touro_id}>
+                <TableRow key={s.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       {s.identificacao}
@@ -126,9 +130,14 @@ export function PainelBancoGenetico({ localId, semen, embrioes, candidatos, pode
                   <TableCell className="text-right tabular-nums">{s.quantidade_doses}</TableCell>
                   {podeEditar && (
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="size-7" title="Remover doses" onClick={() => setTouroRemovendo(s)}>
-                        <Trash2 className="size-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="size-7" title="Editar" onClick={() => setEditandoDoses(s)}>
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-7" title="Remover doses" onClick={() => setTouroRemovendo(s)}>
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -171,7 +180,7 @@ export function PainelBancoGenetico({ localId, semen, embrioes, candidatos, pode
                 <TableHead>Touro</TableHead>
                 <TableHead className="text-right">Quantidade</TableHead>
                 <TableHead>Data de produção</TableHead>
-                {podeEditar && <TableHead className="w-10" />}
+                {podeEditar && <TableHead className="w-20" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -193,9 +202,14 @@ export function PainelBancoGenetico({ localId, semen, embrioes, candidatos, pode
                   <TableCell>{formatarData(l.data_producao)}</TableCell>
                   {podeEditar && (
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="size-7 text-destructive" title="Apagar lote" onClick={() => excluirLote(l)}>
-                        <Trash2 className="size-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="size-7" title="Editar" onClick={() => setEditandoLote(l)}>
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-7 text-destructive" title="Apagar lote" onClick={() => excluirLote(l)}>
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -224,6 +238,7 @@ export function PainelBancoGenetico({ localId, semen, embrioes, candidatos, pode
             aberto={adicionarDosesAberto}
             onFechar={() => setAdicionarDosesAberto(false)}
           />
+          <DialogoEditarDoses localId={localId} candidatos={candidatos} registro={editandoDoses} onFechar={() => setEditandoDoses(null)} />
           <DialogoRemoverDoses localId={localId} touro={touroRemovendo} onFechar={() => setTouroRemovendo(null)} />
           <DialogoNovoLoteEmbrioes
             localId={localId}
@@ -232,6 +247,7 @@ export function PainelBancoGenetico({ localId, semen, embrioes, candidatos, pode
             aberto={novoLoteAberto}
             onFechar={() => setNovoLoteAberto(false)}
           />
+          <DialogoEditarLoteEmbrioes localId={localId} candidatos={candidatos} lote={editandoLote} onFechar={() => setEditandoLote(null)} />
         </>
       )}
     </div>

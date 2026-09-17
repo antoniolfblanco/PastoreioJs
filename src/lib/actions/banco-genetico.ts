@@ -54,6 +54,27 @@ export async function adicionarDosesSemenDireto(
   revalidatePath(caminho(localId));
 }
 
+// Edita touro/quantidade/observações de um registro já existente — corrige
+// erro de digitação sem precisar apagar e recriar (não existe "apagar
+// registro de sêmen", só zerar quantidade).
+export async function atualizarRegistroBancoSemen(
+  localId: string,
+  id: string,
+  touroId: string,
+  quantidadeDoses: number,
+  observacoes: string | null,
+) {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("atualizar_registro_banco_semen", {
+    p_id: id,
+    p_touro_id: touroId,
+    p_quantidade_doses: quantidadeDoses,
+    p_observacoes: observacoes,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(caminho(localId));
+}
+
 export async function removerDosesSemen(localId: string, touroId: string, quantidade: number) {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("remover_doses_semen", {
@@ -95,6 +116,31 @@ export async function adicionarLoteEmbrioes(
   if (error) return { erro: "Não foi possível adicionar o lote: " + error.message };
   revalidatePath(caminho(localId));
   return {};
+}
+
+// Edita doadora/touro/quantidade/data/observações de um lote já existente —
+// corrige erro de digitação sem afetar coberturas já confirmadas com esse
+// lote (elas guardam femea_id/touro_id próprios, não ficam ligadas ao lote).
+export async function atualizarLoteEmbrioes(
+  localId: string,
+  loteId: string,
+  doadoraId: string,
+  touroId: string,
+  quantidade: number,
+  dataProducao: string | null,
+  observacoes: string | null,
+) {
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("atualizar_lote_embrioes", {
+    p_lote_id: loteId,
+    p_doadora_id: doadoraId,
+    p_touro_id: touroId,
+    p_quantidade: quantidade,
+    p_data_producao: dataProducao,
+    p_observacoes: observacoes,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(caminho(localId));
 }
 
 export async function apagarLoteEmbrioes(localId: string, loteId: string) {
