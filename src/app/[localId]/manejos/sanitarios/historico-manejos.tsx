@@ -86,7 +86,8 @@ export function HistoricoManejos({ localId, grupos, animais, areas, medicamentos
     if (!confirm("Apagar este manejo sanitário? Essa ação não pode ser desfeita.")) return;
     setApagando(grupo.id);
     try {
-      await apagarManejoSanitario(localId, grupo.id);
+      const resultado = await apagarManejoSanitario(localId, grupo.id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     } finally {

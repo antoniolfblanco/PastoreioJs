@@ -55,11 +55,17 @@ export async function salvarCategoria(
   return { id: data.id, sexo: ivz.sexo };
 }
 
-export async function apagarCategoria(localId: string, id: string) {
+// Erros esperados viram valor de retorno, nunca throw — o Next.js redige
+// qualquer erro lançado (throw) de uma Server Function em produção, só
+// mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
+export async function apagarCategoria(localId: string, id: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("categorias").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/${localId}/categorias`);
+  return {};
 }
 
 // Copia os templates nacionais (categorias_sugeridas) escolhidos na tela de
@@ -69,8 +75,8 @@ export async function apagarCategoria(localId: string, id: string) {
 // várias sugestões podem compartilhar (ex.: "Potros" e "Potrancos" são
 // ambas "Equinos Machos +6 Meses" pro IVZ), então duas categorias distintas
 // do local podem legitimamente apontar pro mesmo categoria_ivz_id.
-export async function importarCategoriasSugeridas(localId: string, sugeridaIds: string[]) {
-  if (sugeridaIds.length === 0) return;
+export async function importarCategoriasSugeridas(localId: string, sugeridaIds: string[]): Promise<ResultadoAcao> {
+  if (sugeridaIds.length === 0) return {};
 
   const supabase = await criarClienteServidor();
 
@@ -83,8 +89,8 @@ export async function importarCategoriasSugeridas(localId: string, sugeridaIds: 
       supabase.from("categorias").select("descricao").eq("local_id", localId),
     ]);
 
-  if (erroSugeridas) throw new Error(erroSugeridas.message);
-  if (erroExistentes) throw new Error(erroExistentes.message);
+  if (erroSugeridas) return { error: erroSugeridas.message };
+  if (erroExistentes) return { error: erroExistentes.message };
 
   const jaTem = new Set((existentes ?? []).map((c) => c.descricao.trim().toLowerCase()));
   const novas = (sugeridas ?? [])
@@ -98,9 +104,10 @@ export async function importarCategoriasSugeridas(localId: string, sugeridaIds: 
       ordem: s.ordem,
     }));
 
-  if (novas.length === 0) return;
+  if (novas.length === 0) return {};
 
   const { error } = await supabase.from("categorias").insert(novas);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/${localId}/categorias`);
+  return {};
 }

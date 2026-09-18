@@ -160,7 +160,8 @@ export function TabelaAnimais({
   async function excluir(id: string) {
     if (!confirm("Apagar este animal?")) return;
     try {
-      await apagarAnimal(localId, id);
+      const resultado = await apagarAnimal(localId, id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     }

@@ -81,9 +81,15 @@ export async function atualizarManejoSanitario(
   return {};
 }
 
-export async function apagarManejoSanitario(localId: string, manejoId: string) {
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
+export async function apagarManejoSanitario(localId: string, manejoId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("apagar_manejo_sanitario", { p_manejo_id: manejoId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

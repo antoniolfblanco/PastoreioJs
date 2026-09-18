@@ -105,6 +105,10 @@ export function ListaEstacoes({ localId, estacoes, podeEditar }: Props) {
     setCarregandoId(e.id);
     try {
       const resumo = await buscarResumoEstacaoParaExclusao(e.id);
+      if ("error" in resumo) {
+        alert(resumo.error);
+        return;
+      }
       setApagando({ estacao: e, resumo });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Não foi possível carregar a estação.");
@@ -117,7 +121,11 @@ export function ListaEstacoes({ localId, estacoes, podeEditar }: Props) {
     if (!apagando) return;
     setApagandoEmAndamento(true);
     try {
-      await apagarEstacaoReprodutiva(localId, apagando.estacao.id);
+      const resultado = await apagarEstacaoReprodutiva(localId, apagando.estacao.id);
+      if (resultado.error) {
+        alert(resultado.error);
+        return;
+      }
       setApagando(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Não foi possível apagar.");

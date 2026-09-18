@@ -154,7 +154,8 @@ export function PainelAreas({ localId, areas, animais, mortes, movimentacoes, ma
     if (!confirm(`Apagar a área "${area.nome}"?`)) return;
     setApagando(area.id);
     try {
-      await apagarArea(localId, area.id);
+      const resultado = await apagarArea(localId, area.id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     } finally {

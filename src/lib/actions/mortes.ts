@@ -74,13 +74,19 @@ export async function atualizarMorte(
   return {};
 }
 
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
 // Só desfaz o registro de morte mais recente do local (é o que a RPC faz —
 // não existe "desfazer" um grupo específico do meio da lista).
-export async function desfazerUltimaMorte(localId: string) {
+export async function desfazerUltimaMorte(localId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("desfazer_ultima_morte", { p_local_id: localId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
 export type EstadoEnfermidade = { erro?: string; id?: string } | undefined;

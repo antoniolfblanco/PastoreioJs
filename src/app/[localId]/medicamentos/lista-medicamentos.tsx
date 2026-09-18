@@ -97,7 +97,8 @@ export function ListaMedicamentos({ localId, medicamentos, podeEditar }: Props) 
   async function excluir(id: string) {
     if (!confirm("Apagar este medicamento?")) return;
     try {
-      await apagarMedicamento(localId, id);
+      const resultado = await apagarMedicamento(localId, id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     }

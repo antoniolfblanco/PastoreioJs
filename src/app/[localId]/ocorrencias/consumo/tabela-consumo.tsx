@@ -114,7 +114,8 @@ export function TabelaConsumo({ localId, grupos, animaisAtivos, podeEditar }: Pr
     if (!confirm("Desfazer o registro de consumo mais recente? Os animais voltam a ficar ativos.")) return;
     setDesfazendo(true);
     try {
-      await desfazerUltimoConsumo(localId);
+      const resultado = await desfazerUltimoConsumo(localId);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível desfazer.");
     } finally {

@@ -110,7 +110,8 @@ export function ListaExternos({ localId, externos, categorias, racas, categorias
     )
       return;
     try {
-      await apagarAnimalExterno(localId, e.id);
+      const resultado = await apagarAnimalExterno(localId, e.id);
+      if (resultado.error) alert(resultado.error);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Não foi possível apagar.");
     }

@@ -69,11 +69,17 @@ export async function atualizarMovimentacao(
   return {};
 }
 
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
 // Desfazer não apaga nada — registra uma NOVA movimentação invertendo
 // origem e destino da última, igual à troca de categoria.
-export async function desfazerUltimaMovimentacao(localId: string) {
+export async function desfazerUltimaMovimentacao(localId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("desfazer_ultima_movimentacao", { p_local_id: localId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

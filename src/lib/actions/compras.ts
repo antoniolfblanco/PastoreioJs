@@ -97,33 +97,41 @@ export async function atualizarCompra(
   return {};
 }
 
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
 // Apaga a compra e os animais que ela criou (reutiliza apagar_animal, que
 // recusa se algum já tiver histórico que não pode se perder).
-export async function apagarCompra(localId: string, compraId: string) {
+export async function apagarCompra(localId: string, compraId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("apagar_compra", { p_compra_id: compraId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function definirValorCompraAnimal(localId: string, animalId: string, valor: number) {
+export async function definirValorCompraAnimal(localId: string, animalId: string, valor: number): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("definir_valor_compra_animal", {
     p_animal_id: animalId,
     p_valor: valor,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
 // Fecha a compra por um total, rateado entre todos os animais dela — por
 // peso quando todos têm peso de compra, senão igual por cabeça.
-export async function definirValorTotalCompra(localId: string, compraId: string, valorTotal: number) {
+export async function definirValorTotalCompra(localId: string, compraId: string, valorTotal: number): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("definir_valor_total_compra", {
     p_compra_id: compraId,
     p_valor_total: valorTotal,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

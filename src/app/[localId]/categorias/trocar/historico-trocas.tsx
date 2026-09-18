@@ -97,7 +97,8 @@ export function HistoricoTrocas({ localId, grupos, podeEditar }: Props) {
     if (!confirm("Desfazer a última troca de categoria? Isso registra uma nova troca de volta pra categoria anterior.")) return;
     setDesfazendo(true);
     try {
-      await desfazerUltimaTrocaCategoria(localId);
+      const resultado = await desfazerUltimaTrocaCategoria(localId);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível desfazer.");
     } finally {

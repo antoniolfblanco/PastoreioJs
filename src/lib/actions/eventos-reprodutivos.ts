@@ -61,16 +61,24 @@ export async function salvarEventoReprodutivo(
   return {};
 }
 
-export async function buscarResumoEventoParaExclusao(eventoId: string): Promise<ResumoExclusaoReprodutiva> {
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
+export async function buscarResumoEventoParaExclusao(
+  eventoId: string,
+): Promise<ResumoExclusaoReprodutiva | { error: string }> {
   const supabase = await criarClienteServidor();
   const { data, error } = await supabase.rpc("resumo_evento_para_exclusao", { p_evento_id: eventoId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   return data as ResumoExclusaoReprodutiva;
 }
 
-export async function apagarEventoReprodutivo(localId: string, eventoId: string) {
+export async function apagarEventoReprodutivo(localId: string, eventoId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("apagar_evento_reprodutivo", { p_evento_id: eventoId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

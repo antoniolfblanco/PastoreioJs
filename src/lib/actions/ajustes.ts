@@ -96,20 +96,27 @@ export async function registrarSaidaAjuste(
   return {};
 }
 
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
 // Entrada e saída têm "mais recente" próprios (são contados separadamente
 // pela RPC) — desfazer uma não mexe na outra. Desfazer entrada apaga os
 // animais criados (recusa se algum já saiu do rebanho de outro jeito);
 // desfazer saída só devolve a situação pra ativo.
-export async function desfazerUltimaEntradaAjuste(localId: string) {
+export async function desfazerUltimaEntradaAjuste(localId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("desfazer_ultima_entrada_ajuste", { p_local_id: localId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function desfazerUltimaSaidaAjuste(localId: string) {
+export async function desfazerUltimaSaidaAjuste(localId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("desfazer_ultima_saida_ajuste", { p_local_id: localId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

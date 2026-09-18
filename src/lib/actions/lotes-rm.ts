@@ -33,23 +33,31 @@ export async function salvarLoteRm(
   return { id: data.id };
 }
 
-export async function apagarLoteRm(localId: string, id: string) {
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
+export async function apagarLoteRm(localId: string, id: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("lotes_rm").delete().eq("id", id);
-  if (error) throw new Error("Não foi possível apagar — ele já foi usado em alguma cobertura.");
+  if (error) return { error: "Não foi possível apagar — ele já foi usado em alguma cobertura." };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function adicionarTouroLote(localId: string, loteRmId: string, touroId: string) {
+export async function adicionarTouroLote(localId: string, loteRmId: string, touroId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("lotes_rm_touros").insert({ lote_rm_id: loteRmId, local_id: localId, touro_id: touroId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function removerTouroLote(localId: string, loteRmId: string, touroId: string) {
+export async function removerTouroLote(localId: string, loteRmId: string, touroId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("lotes_rm_touros").delete().eq("lote_rm_id", loteRmId).eq("touro_id", touroId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

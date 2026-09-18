@@ -87,35 +87,43 @@ export async function atualizarVenda(
   return {};
 }
 
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
 // Apaga a venda e devolve os animais pro rebanho ativo (não apaga o
 // animal — ele já existia antes da venda).
-export async function apagarVenda(localId: string, vendaId: string) {
+export async function apagarVenda(localId: string, vendaId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("apagar_venda", { p_venda_id: vendaId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
 // Fecha a venda por um total, rateado entre TODOS os animais dela — por
 // peso quando todos têm peso de venda, senão igual por cabeça.
-export async function definirValorTotalVenda(localId: string, vendaId: string, valorTotal: number) {
+export async function definirValorTotalVenda(localId: string, vendaId: string, valorTotal: number): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("definir_valor_total_venda", {
     p_venda_id: vendaId,
     p_valor_total: valorTotal,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
 // Confirma o valor definitivo só dos animais "a rendimento" ainda
 // pendentes, rateado por peso (exige peso de venda em todos os pendentes).
-export async function confirmarValorTotalVenda(localId: string, vendaId: string, valorTotal: number) {
+export async function confirmarValorTotalVenda(localId: string, vendaId: string, valorTotal: number): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("confirmar_valor_total_venda", {
     p_venda_id: vendaId,
     p_valor_total: valorTotal,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

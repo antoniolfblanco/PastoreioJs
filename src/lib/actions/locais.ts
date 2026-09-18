@@ -61,20 +61,27 @@ export async function atualizarLocal(
   return {};
 }
 
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
 // Não chamam redirect() aqui: são invocadas do cliente dentro de um
 // try/catch (pra tratar erro da RPC), e o throw especial do redirect() do
 // Next seria capturado pelo catch em vez de navegar. Quem chama decide a
 // navegação depois de confirmar sucesso (ver sair-ou-apagar-local.tsx).
-export async function apagarLocal(localId: string) {
+export async function apagarLocal(localId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("apagar_local_completo", { p_local_id: localId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+  return {};
 }
 
-export async function sairDoLocal(localId: string) {
+export async function sairDoLocal(localId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("sair_do_local", { p_local_id: localId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+  return {};
 }
 
 export type EstadoConvite = { erro?: string } | undefined;
@@ -102,40 +109,44 @@ export async function convidarUsuario(
   return {};
 }
 
-export async function cancelarConvite(localId: string, conviteId: string) {
+export async function cancelarConvite(localId: string, conviteId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("cancelar_convite", { p_convite_id: conviteId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function alterarPerfilMembro(localId: string, usuarioId: string, perfil: string) {
+export async function alterarPerfilMembro(localId: string, usuarioId: string, perfil: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("alterar_perfil_membro", {
     p_local_id: localId,
     p_usuario_id: usuarioId,
     p_perfil: perfil,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function removerMembro(localId: string, usuarioId: string) {
+export async function removerMembro(localId: string, usuarioId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("remover_membro", {
     p_local_id: localId,
     p_usuario_id: usuarioId,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function responderConvite(conviteId: string, aceitar: boolean) {
+export async function responderConvite(conviteId: string, aceitar: boolean): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("responder_convite", {
     p_convite_id: conviteId,
     p_aceitar: aceitar,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/");
+  return {};
 }

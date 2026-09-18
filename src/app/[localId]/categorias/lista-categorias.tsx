@@ -137,7 +137,8 @@ export function ListaCategorias({ localId, categorias, categoriasIvz, categorias
   async function excluir(id: string) {
     if (!confirm("Apagar esta categoria?")) return;
     try {
-      await apagarCategoria(localId, id);
+      const resultado = await apagarCategoria(localId, id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     }

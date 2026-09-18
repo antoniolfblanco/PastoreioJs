@@ -89,7 +89,8 @@ export function HistoricoMovimentacoes({ localId, grupos, areas, podeEditar }: P
     if (!confirm("Desfazer a última movimentação? Isso registra uma nova movimentação de volta pra área anterior.")) return;
     setDesfazendo(true);
     try {
-      await desfazerUltimaMovimentacao(localId);
+      const resultado = await desfazerUltimaMovimentacao(localId);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível desfazer.");
     } finally {

@@ -118,6 +118,10 @@ export function ListaEventos({ localId, estacoes, eventos, femeasPorEvento, pode
     setCarregandoId(evento.id);
     try {
       const resumo = await buscarResumoEventoParaExclusao(evento.id);
+      if ("error" in resumo) {
+        alert(resumo.error);
+        return;
+      }
       setAlvo({ evento, temCobertura: resumo.coberturas > 0 });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível carregar o evento.");
@@ -130,6 +134,10 @@ export function ListaEventos({ localId, estacoes, eventos, femeasPorEvento, pode
     setCarregandoId(evento.id);
     try {
       const resumo = await buscarResumoEventoParaExclusao(evento.id);
+      if ("error" in resumo) {
+        alert(resumo.error);
+        return;
+      }
       setApagando({ evento, resumo });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível carregar o evento.");
@@ -142,7 +150,11 @@ export function ListaEventos({ localId, estacoes, eventos, femeasPorEvento, pode
     if (!apagando) return;
     setApagandoEmAndamento(true);
     try {
-      await apagarEventoReprodutivo(localId, apagando.evento.id);
+      const resultado = await apagarEventoReprodutivo(localId, apagando.evento.id);
+      if (resultado.error) {
+        alert(resultado.error);
+        return;
+      }
       setApagando(null);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");

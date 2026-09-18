@@ -106,7 +106,8 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
   async function excluir(id: string) {
     if (!confirm("Apagar esta área?")) return;
     try {
-      await apagarArea(localId, id);
+      const resultado = await apagarArea(localId, id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     }

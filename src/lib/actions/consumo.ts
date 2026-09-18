@@ -77,11 +77,17 @@ export async function atualizarConsumo(
   return {};
 }
 
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
 // Só desfaz o registro de consumo mais recente do local — mesma regra de
 // Mortes, é o que a RPC do banco faz.
-export async function desfazerUltimoConsumo(localId: string) {
+export async function desfazerUltimoConsumo(localId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("desfazer_ultimo_consumo", { p_local_id: localId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

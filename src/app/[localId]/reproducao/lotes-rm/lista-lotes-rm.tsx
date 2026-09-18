@@ -23,7 +23,8 @@ export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) 
   async function excluir(lote: LoteRm) {
     if (!confirm(`Apagar o lote "${lote.nome}"?`)) return;
     try {
-      await apagarLoteRm(localId, lote.id);
+      const resultado = await apagarLoteRm(localId, lote.id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     }
@@ -32,7 +33,11 @@ export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) 
   async function adicionarTouro(lote: LoteRm, touroId: string) {
     setEmAndamento(`${lote.id}:${touroId}`);
     try {
-      await adicionarTouroLote(localId, lote.id, touroId);
+      const resultado = await adicionarTouroLote(localId, lote.id, touroId);
+      if (resultado.error) {
+        alert(resultado.error);
+        return;
+      }
       setLoteAdicionandoTouro(null);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível adicionar o touro.");
@@ -44,7 +49,8 @@ export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) 
   async function removerTouro(lote: LoteRm, touroId: string) {
     setEmAndamento(`${lote.id}:${touroId}`);
     try {
-      await removerTouroLote(localId, lote.id, touroId);
+      const resultado = await removerTouroLote(localId, lote.id, touroId);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível remover.");
     } finally {

@@ -122,7 +122,8 @@ export function HistoricoVendas({ localId, vendas, podeEditar }: Props) {
     )
       return;
     try {
-      await apagarVenda(localId, venda.id);
+      const resultado = await apagarVenda(localId, venda.id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     }
@@ -313,7 +314,7 @@ function DialogoValorTotal({
   descricao: string;
   venda: Venda | null;
   onFechar: () => void;
-  onConfirmar: (vendaId: string, valor: number) => Promise<void>;
+  onConfirmar: (vendaId: string, valor: number) => Promise<{ error?: string }>;
 }) {
   return (
     <Dialog open={venda !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
@@ -347,7 +348,7 @@ function ConteudoValorTotal({
   descricao: string;
   venda: Venda;
   onFechar: () => void;
-  onConfirmar: (vendaId: string, valor: number) => Promise<void>;
+  onConfirmar: (vendaId: string, valor: number) => Promise<{ error?: string }>;
 }) {
   const [valor, setValor] = useState("");
   const [emAndamento, setEmAndamento] = useState(false);
@@ -362,7 +363,11 @@ function ConteudoValorTotal({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await onConfirmar(venda.id, numero);
+      const resultado = await onConfirmar(venda.id, numero);
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível salvar.");

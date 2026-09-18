@@ -86,7 +86,8 @@ export function ListaRacas({ localId, racas, podeEditar }: Props) {
   async function excluir(r: Raca) {
     if (!confirm(`Apagar a raça "${r.descricao}"?`)) return;
     try {
-      await apagarRaca(localId, r.id);
+      const resultado = await apagarRaca(localId, r.id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar — ela já pode ter sido usada em algum animal.");
     }

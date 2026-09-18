@@ -107,8 +107,9 @@ export function TabelaAjustes({ localId, grupos, animaisAtivos, areas, categoria
     if (!confirm(`Desfazer esta ${acaoLabel} de acerto de contagem?`)) return;
     setDesfazendo(grupo.ocorrencia_grupo_id);
     try {
-      if (grupo.tipo === "entrada") await desfazerUltimaEntradaAjuste(localId);
-      else await desfazerUltimaSaidaAjuste(localId);
+      const resultado =
+        grupo.tipo === "entrada" ? await desfazerUltimaEntradaAjuste(localId) : await desfazerUltimaSaidaAjuste(localId);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível desfazer.");
     } finally {

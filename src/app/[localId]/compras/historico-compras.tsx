@@ -119,7 +119,8 @@ export function HistoricoCompras({ localId, compras, podeEditar }: Props) {
     )
       return;
     try {
-      await apagarCompra(localId, compra.id);
+      const resultado = await apagarCompra(localId, compra.id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     }
@@ -340,7 +341,11 @@ function ConteudoDefinirValorTotal({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await definirValorTotalCompra(localId, compra.id, numero);
+      const resultado = await definirValorTotalCompra(localId, compra.id, numero);
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível salvar.");
@@ -412,7 +417,11 @@ function ConteudoDefinirValorAnimal({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await definirValorCompraAnimal(localId, alvo.animalId, numero);
+      const resultado = await definirValorCompraAnimal(localId, alvo.animalId, numero);
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível salvar.");

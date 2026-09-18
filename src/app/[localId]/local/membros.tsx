@@ -43,12 +43,14 @@ export function Membros({
 
   async function excluirConvite(id: string) {
     if (!confirm("Cancelar este convite?")) return;
-    await cancelarConvite(localId, id);
+    const resultado = await cancelarConvite(localId, id);
+    if (resultado.error) alert(resultado.error);
   }
 
   async function trocarPerfil(usuarioId: string, perfil: string) {
     try {
-      await alterarPerfilMembro(localId, usuarioId, perfil);
+      const resultado = await alterarPerfilMembro(localId, usuarioId, perfil);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível alterar a credencial.");
     }
@@ -57,7 +59,8 @@ export function Membros({
   async function excluirMembro(usuarioId: string, nome: string) {
     if (!confirm(`Remover "${nome}" deste local?`)) return;
     try {
-      await removerMembro(localId, usuarioId);
+      const resultado = await removerMembro(localId, usuarioId);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível remover.");
     }

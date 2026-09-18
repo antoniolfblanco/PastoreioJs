@@ -71,7 +71,11 @@ export function DialogoImportarSugeridas({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await importarCategoriasSugeridas(localId, Array.from(selecionadas));
+      const resultado = await importarCategoriasSugeridas(localId, Array.from(selecionadas));
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       fechar(false);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível importar.");

@@ -31,7 +31,11 @@ export function ConvitesPendentes({
   async function responder(id: string, aceitar: boolean) {
     setProcessando(id);
     try {
-      await responderConvite(id, aceitar);
+      const resultado = await responderConvite(id, aceitar);
+      if (resultado.error) {
+        alert(resultado.error);
+        return;
+      }
       router.refresh();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível responder ao convite.");

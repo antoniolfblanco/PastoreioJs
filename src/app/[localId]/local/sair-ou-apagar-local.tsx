@@ -26,7 +26,12 @@ export function SairOuApagarLocal({
     setSaindo(true);
     setErroSair(undefined);
     try {
-      await sairDoLocal(localId);
+      const resultado = await sairDoLocal(localId);
+      if (resultado.error) {
+        setErroSair(resultado.error);
+        setSaindo(false);
+        return;
+      }
       router.push("/");
     } catch (e) {
       setErroSair(e instanceof Error ? e.message : "Não foi possível sair.");
@@ -70,7 +75,12 @@ function BotaoApagarLocal({ localId, nome }: { localId: string; nome: string }) 
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await apagarLocal(localId);
+      const resultado = await apagarLocal(localId);
+      if (resultado.error) {
+        setErro(resultado.error);
+        setEmAndamento(false);
+        return;
+      }
       router.push("/");
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível apagar o local.");

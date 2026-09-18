@@ -77,9 +77,15 @@ export async function salvarAnimalExterno(
   return {};
 }
 
-export async function apagarAnimalExterno(localId: string, id: string) {
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
+export async function apagarAnimalExterno(localId: string, id: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("apagar_animal", { p_animal_id: id });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/${localId}/reproducao/externos`);
+  return {};
 }

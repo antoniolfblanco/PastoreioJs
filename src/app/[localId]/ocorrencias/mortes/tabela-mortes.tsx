@@ -111,7 +111,8 @@ export function TabelaMortes({ localId, grupos, animaisAtivos, enfermidades, pod
     if (!confirm("Desfazer o registro de morte mais recente? Os animais voltam a ficar ativos.")) return;
     setDesfazendo(true);
     try {
-      await desfazerUltimaMorte(localId);
+      const resultado = await desfazerUltimaMorte(localId);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível desfazer.");
     } finally {

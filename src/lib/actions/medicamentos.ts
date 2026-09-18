@@ -42,9 +42,15 @@ export async function salvarMedicamento(
   return { id: data.id };
 }
 
-export async function apagarMedicamento(localId: string, id: string) {
+// Erros esperados viram valor de retorno, nunca throw — o Next.js redige
+// qualquer erro lançado (throw) de uma Server Function em produção, só
+// mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
+export async function apagarMedicamento(localId: string, id: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("medicamentos").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/${localId}/medicamentos`);
+  return {};
 }

@@ -37,12 +37,18 @@ export async function salvarRaca(
   return { id: data.id };
 }
 
-export async function apagarRaca(localId: string, id: string) {
+// Erros esperados (regra de negócio) viram valor de retorno, nunca throw —
+// o Next.js redige qualquer erro lançado (throw) de uma Server Function em
+// produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
+export async function apagarRaca(localId: string, id: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { data: raca } = await supabase.from("racas").select("padrao").eq("id", id).single();
-  if (raca?.padrao) throw new Error("Não é possível apagar a raça padrão do local.");
+  if (raca?.padrao) return { error: "Não é possível apagar a raça padrão do local." };
 
   const { error } = await supabase.from("racas").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/${localId}/racas`);
+  return {};
 }
