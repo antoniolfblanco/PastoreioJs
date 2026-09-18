@@ -65,7 +65,8 @@ export function PainelBancoGenetico({ localId, semen, embrioes, candidatos, pode
     )
       return;
     try {
-      await apagarLoteEmbrioes(localId, lote.id);
+      const resultado = await apagarLoteEmbrioes(localId, lote.id);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
     }

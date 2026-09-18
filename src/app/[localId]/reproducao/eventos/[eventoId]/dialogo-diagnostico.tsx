@@ -98,7 +98,7 @@ function ConteudoDiagnostico({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await registrarDiagnosticosGestacao(localId, eventoId, {
+      const resposta = await registrarDiagnosticosGestacao(localId, eventoId, {
         resultados: Array.from(resultadosPorId.entries()).map(([coberturaId, resultado]) => ({
           coberturaId,
           resultado,
@@ -108,6 +108,10 @@ function ConteudoDiagnostico({
         responsavel: responsavel.trim() || null,
         observacoes: observacoes.trim() || null,
       });
+      if (resposta.error) {
+        setErro(resposta.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível registrar.");

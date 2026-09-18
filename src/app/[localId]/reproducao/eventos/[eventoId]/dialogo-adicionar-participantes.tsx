@@ -13,7 +13,7 @@ function identificacao(a: CandidatoAnimal) {
   return a.externo ? `${base} (externo)` : base;
 }
 
-type AcaoAdicionar = (localId: string, eventoId: string, ids: string[]) => Promise<unknown>;
+type AcaoAdicionar = (localId: string, eventoId: string, ids: string[]) => Promise<{ error?: string }>;
 
 export function DialogoAdicionarParticipantes({
   localId,
@@ -120,7 +120,11 @@ function ConteudoAdicionarParticipantes({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await acao(localId, eventoId, Array.from(selecionados));
+      const resultado = await acao(localId, eventoId, Array.from(selecionados));
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível adicionar.");

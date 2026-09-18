@@ -83,12 +83,16 @@ function ConteudoConfirmarAcasalamentoEmbriao({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await confirmarAcasalamentoEmbriao(localId, eventoId, {
+      const resultado = await confirmarAcasalamentoEmbriao(localId, eventoId, {
         coberturaIds,
         loteEmbriaoId: loteId,
         data,
         responsavel: responsavel.trim() || null,
       });
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível confirmar.");

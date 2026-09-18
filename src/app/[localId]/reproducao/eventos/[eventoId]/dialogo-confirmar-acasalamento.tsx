@@ -109,13 +109,17 @@ function ConteudoConfirmarAcasalamento({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await confirmarAcasalamentos(localId, eventoId, {
+      const resultado = await confirmarAcasalamentos(localId, eventoId, {
         coberturaIds,
         touroId: usarLoteRm ? null : touroId,
         rmLoteId: usarLoteRm ? rmLoteId : null,
         data,
         responsavel: responsavel.trim() || null,
       });
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível confirmar.");

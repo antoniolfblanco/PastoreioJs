@@ -74,7 +74,11 @@ function ConteudoAdicionarDosesSemen({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await adicionarDosesSemenDireto(localId, touroId, qtd, null);
+      const resultado = await adicionarDosesSemenDireto(localId, touroId, qtd, null);
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível adicionar.");

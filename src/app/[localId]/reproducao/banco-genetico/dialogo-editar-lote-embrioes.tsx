@@ -81,7 +81,7 @@ function ConteudoEditarLoteEmbrioes({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await atualizarLoteEmbrioes(
+      const resultado = await atualizarLoteEmbrioes(
         localId,
         lote.id,
         doadoraId,
@@ -90,6 +90,10 @@ function ConteudoEditarLoteEmbrioes({
         dataProducao || null,
         observacoes.trim() || null,
       );
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível salvar.");

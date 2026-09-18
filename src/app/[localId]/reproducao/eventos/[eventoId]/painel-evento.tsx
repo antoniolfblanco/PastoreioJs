@@ -145,7 +145,11 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
     if (!confirm("Remover esta fêmea do evento?")) return;
     setRemovendoId(participanteId);
     try {
-      await removerParticipante(localId, evento.id, participanteId);
+      const resultado = await removerParticipante(localId, evento.id, participanteId);
+      if (resultado.error) {
+        alert(resultado.error);
+        return;
+      }
       setSelecionados((atual) => {
         const novo = new Set(atual);
         novo.delete(participanteId);
@@ -161,13 +165,14 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
   async function confirmarLinha(participanteId: string, touroId: string) {
     setLinhaEmAndamento(participanteId);
     try {
-      await confirmarAcasalamentos(localId, evento.id, {
+      const resultado = await confirmarAcasalamentos(localId, evento.id, {
         coberturaIds: [participanteId],
         touroId,
         rmLoteId: null,
         data: dataAcasalamentoPorLinha[participanteId] || hojeISO,
         responsavel: null,
       });
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível confirmar.");
     } finally {
@@ -178,12 +183,13 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
   async function confirmarLinhaEmbriao(participanteId: string, loteEmbriaoId: string) {
     setLinhaEmAndamento(participanteId);
     try {
-      await confirmarAcasalamentoEmbriao(localId, evento.id, {
+      const resultado = await confirmarAcasalamentoEmbriao(localId, evento.id, {
         coberturaIds: [participanteId],
         loteEmbriaoId,
         data: dataAcasalamentoPorLinha[participanteId] || hojeISO,
         responsavel: null,
       });
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível confirmar.");
     } finally {
@@ -195,7 +201,8 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
     if (!confirm("Desfazer este acasalamento e voltar pra pendente?")) return;
     setLinhaEmAndamento(participanteId);
     try {
-      await desfazerAcasalamento(localId, evento.id, participanteId);
+      const resultado = await desfazerAcasalamento(localId, evento.id, participanteId);
+      if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível desfazer.");
     } finally {
@@ -210,12 +217,13 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
   ) {
     setLinhaEmAndamento(participanteId);
     try {
-      await registrarDiagnosticosGestacao(localId, evento.id, {
+      const resposta = await registrarDiagnosticosGestacao(localId, evento.id, {
         resultados: [{ coberturaId: participanteId, resultado, certeza }],
         data: dataDiagnosticoPorLinha[participanteId] || hojeISO,
         responsavel: null,
         observacoes: null,
       });
+      if (resposta.error) alert(resposta.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível registrar.");
     } finally {

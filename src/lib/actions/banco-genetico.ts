@@ -9,6 +9,11 @@ function caminho(localId: string) {
 
 export type EstadoBancoGenetico = { erro?: string } | undefined;
 
+// Erros esperados (regra de negócio da RPC) viram valor de retorno, nunca
+// throw — o Next.js redige qualquer erro lançado (throw) de uma Server
+// Function em produção, só mostra o texto real em dev.
+export type ResultadoAcao = { error?: string };
+
 export async function adicionarDosesSemen(
   _estadoAnterior: EstadoBancoGenetico,
   formData: FormData,
@@ -42,7 +47,7 @@ export async function adicionarDosesSemenDireto(
   touroId: string,
   quantidade: number,
   observacoes: string | null,
-) {
+): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("adicionar_doses_semen", {
     p_local_id: localId,
@@ -50,8 +55,9 @@ export async function adicionarDosesSemenDireto(
     p_quantidade: quantidade,
     p_observacoes: observacoes,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
 // Edita touro/quantidade/observações de um registro já existente — corrige
@@ -63,7 +69,7 @@ export async function atualizarRegistroBancoSemen(
   touroId: string,
   quantidadeDoses: number,
   observacoes: string | null,
-) {
+): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("atualizar_registro_banco_semen", {
     p_id: id,
@@ -71,19 +77,21 @@ export async function atualizarRegistroBancoSemen(
     p_quantidade_doses: quantidadeDoses,
     p_observacoes: observacoes,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function removerDosesSemen(localId: string, touroId: string, quantidade: number) {
+export async function removerDosesSemen(localId: string, touroId: string, quantidade: number): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("remover_doses_semen", {
     p_local_id: localId,
     p_touro_id: touroId,
     p_quantidade: quantidade,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
 export async function adicionarLoteEmbrioes(
@@ -129,7 +137,7 @@ export async function atualizarLoteEmbrioes(
   quantidade: number,
   dataProducao: string | null,
   observacoes: string | null,
-) {
+): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("atualizar_lote_embrioes", {
     p_lote_id: loteId,
@@ -139,13 +147,15 @@ export async function atualizarLoteEmbrioes(
     p_data_producao: dataProducao,
     p_observacoes: observacoes,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }
 
-export async function apagarLoteEmbrioes(localId: string, loteId: string) {
+export async function apagarLoteEmbrioes(localId: string, loteId: string): Promise<ResultadoAcao> {
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("apagar_lote_embrioes", { p_lote_id: loteId });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(caminho(localId));
+  return {};
 }

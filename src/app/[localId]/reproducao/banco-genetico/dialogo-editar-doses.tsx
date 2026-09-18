@@ -73,7 +73,11 @@ function ConteudoEditarDoses({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await atualizarRegistroBancoSemen(localId, registro.id, touroId, qtd, observacoes.trim() || null);
+      const resultado = await atualizarRegistroBancoSemen(localId, registro.id, touroId, qtd, observacoes.trim() || null);
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível salvar.");

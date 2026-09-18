@@ -58,7 +58,11 @@ function ConteudoRemoverDoses({
     setEmAndamento(true);
     setErro(undefined);
     try {
-      await removerDosesSemen(localId, touro.touro_id, valor);
+      const resultado = await removerDosesSemen(localId, touro.touro_id, valor);
+      if (resultado.error) {
+        setErro(resultado.error);
+        return;
+      }
       onFechar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível remover.");
