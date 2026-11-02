@@ -1,6 +1,6 @@
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { TabelaAnimaisMovimentacao } from "./tabela-animais-movimentacao";
+import { NovaMovimentacao } from "./nova-movimentacao";
 import { HistoricoMovimentacoes } from "./historico-movimentacoes";
 
 export type Especie = "bovino" | "ovino" | "equino";
@@ -20,8 +20,10 @@ export type AnimalMovimentacao = {
 };
 
 export type OpcaoArea = { id: string; nome: string };
+export type CicloAtivo = { nome: string; data_inicio: string; data_fim: string | null } | null;
 
 export type MovimentacaoAnimal = {
+  categoria_descricao: string;
   nome: string | null;
   brinco: string | null;
   tatuagem: string | null;
@@ -33,6 +35,8 @@ export type GrupoMovimentacao = {
   responsavel: string | null;
   descricao: string | null;
   criado_em: string;
+  especie: Especie | null;
+  area_origem_id: string | null;
   area_origem_nome: string | null;
   area_destino_nome: string | null;
   area_destino_id: string;
@@ -86,19 +90,21 @@ export default async function MovimentacaoPage({
     animaisAtivosRaw,
     { data: areas, error: erroAreas },
     { data: movimentacoesRaw, error: erroMovimentacoes },
+    { data: ciclo },
   ] = await Promise.all([
     buscarAnimaisAtivos(supabase, localId),
     supabase.from("areas").select("id, nome").eq("local_id", localId).eq("ativo", true).order("ordem"),
     supabase
       .from("movimentacoes")
       .select(
-        `movimentacao_grupo_id, data, responsavel, descricao, criado_em, animal_id, area_destino_id,
+        `movimentacao_grupo_id, data, responsavel, descricao, criado_em, animal_id, area_origem_id, area_destino_id,
          origem:areas!area_origem_id(nome),
          destino:areas!area_destino_id(nome),
-         animais(nome, brinco, tatuagem)`,
+         animais(nome, brinco, tatuagem, especie, categorias!categoria_id(descricao))`,
       )
       .eq("local_id", localId)
       .order("criado_em", { ascending: false }),
+    supabase.from("ciclos").select("nome, data_inicio, data_fim").eq("local_id", localId).eq("ativo", true).maybeSingle(),
   ]);
 
   if (erroAreas || erroMovimentacoes) {
@@ -117,15 +123,18 @@ export default async function MovimentacaoPage({
 
   const grupos = new Map<string, GrupoMovimentacao>();
   for (const linha of movimentacoesRaw ?? []) {
-    const animalInfo = primeiro(
-      linha.animais as
-        | { nome: string | null; brinco: string | null; tatuagem: string | null }
-        | { nome: string | null; brinco: string | null; tatuagem: string | null }[]
-        | null,
-    );
+    type InfoAnimal = {
+      nome: string | null;
+      brinco: string | null;
+      tatuagem: string | null;
+      especie: Especie;
+      categorias: { descricao: string } | { descricao: string }[] | null;
+    };
+    const animalInfo = primeiro(linha.animais as InfoAnimal | InfoAnimal[] | null);
     const origem = primeiro(linha.origem as { nome: string } | { nome: string }[] | null);
     const destino = primeiro(linha.destino as { nome: string } | { nome: string }[] | null);
     const animalEntry: MovimentacaoAnimal = {
+      categoria_descricao: primeiro(animalInfo?.categorias ?? null)?.descricao ?? "Sem categoria",
       nome: animalInfo?.nome ?? null,
       brinco: animalInfo?.brinco ?? null,
       tatuagem: animalInfo?.tatuagem ?? null,
@@ -140,6 +149,8 @@ export default async function MovimentacaoPage({
         responsavel: linha.responsavel,
         descricao: linha.descricao,
         criado_em: linha.criado_em,
+        especie: animalInfo?.especie ?? null,
+        area_origem_id: linha.area_origem_id,
         area_origem_nome: origem?.nome ?? null,
         area_destino_nome: destino?.nome ?? null,
         area_destino_id: linha.area_destino_id,
@@ -154,14 +165,12 @@ export default async function MovimentacaoPage({
         localId={localId}
         grupos={Array.from(grupos.values())}
         areas={(areas as OpcaoArea[]) ?? []}
+        ciclo={(ciclo as CicloAtivo) ?? null}
         podeEditar={podeEditar}
       />
-      <TabelaAnimaisMovimentacao
-        localId={localId}
-        animais={animaisAtivos}
-        areas={(areas as OpcaoArea[]) ?? []}
-        podeEditar={podeEditar}
-      />
+      {podeEditar && (
+        <NovaMovimentacao localId={localId} animais={animaisAtivos} areas={(areas as OpcaoArea[]) ?? []} />
+      )}
     </div>
   );
 }
