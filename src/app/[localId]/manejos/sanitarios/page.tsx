@@ -1,6 +1,6 @@
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { TabelaAnimaisManejo } from "./tabela-animais-manejo";
+import { NovoManejo } from "./novo-manejo";
 import { HistoricoManejos } from "./historico-manejos";
 
 export type Especie = "bovino" | "ovino" | "equino";
@@ -20,6 +20,7 @@ export type AnimalManejo = {
 };
 
 export type OpcaoArea = { id: string; nome: string };
+export type CicloAtivo = { nome: string; data_inicio: string; data_fim: string | null } | null;
 export type OpcaoMedicamento = {
   id: string;
   descricao: string;
@@ -100,6 +101,7 @@ export default async function ManejosSanitariosPage({
     { data: manejosRaw, error: erroManejos },
     { data: manejosAnimaisRaw, error: erroManejosAnimais },
     { data: manejosMedicamentosRaw, error: erroManejosMedicamentos },
+    { data: ciclo },
   ] = await Promise.all([
     buscarAnimaisAtivos(supabase, localId),
     supabase.from("areas").select("id, nome").eq("local_id", localId).eq("ativo", true).order("ordem"),
@@ -119,6 +121,7 @@ export default async function ManejosSanitariosPage({
       .from("manejos_sanitarios_medicamentos")
       .select("manejo_id, medicamento_id, medicamentos(descricao)")
       .eq("local_id", localId),
+    supabase.from("ciclos").select("nome, data_inicio, data_fim").eq("local_id", localId).eq("ativo", true).maybeSingle(),
   ]);
 
   if (erroAreas || erroMedicamentos || erroManejos || erroManejosAnimais || erroManejosMedicamentos) {
@@ -187,15 +190,17 @@ export default async function ManejosSanitariosPage({
         animais={animaisAtivos}
         areas={(areas as OpcaoArea[]) ?? []}
         medicamentos={(medicamentos as OpcaoMedicamento[]) ?? []}
+        ciclo={(ciclo as CicloAtivo) ?? null}
         podeEditar={podeEditar}
       />
-      <TabelaAnimaisManejo
-        localId={localId}
-        animais={animaisAtivos}
-        areas={(areas as OpcaoArea[]) ?? []}
-        medicamentos={(medicamentos as OpcaoMedicamento[]) ?? []}
-        podeEditar={podeEditar}
-      />
+      {podeEditar && (
+        <NovoManejo
+          localId={localId}
+          animais={animaisAtivos}
+          areas={(areas as OpcaoArea[]) ?? []}
+          medicamentos={(medicamentos as OpcaoMedicamento[]) ?? []}
+        />
+      )}
     </div>
   );
 }
