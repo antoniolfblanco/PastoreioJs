@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Undo2, Skull, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Undo2, Skull, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,9 +14,10 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
+import { TabelaResumo, contar } from "@/components/tabela-resumo";
 import { desfazerUltimaMorte } from "@/lib/actions/mortes";
 import { DialogoMorte } from "./dialogo-morte";
-import type { AnimalAtivo, Especie, GrupoMorte, OpcaoEnfermidade } from "./page";
+import type { Especie, GrupoMorte, OpcaoEnfermidade } from "./page";
 
 const rotulosEspecie: Record<Especie, string> = { bovino: "Bovino", ovino: "Ovino", equino: "Equino" };
 
@@ -52,17 +53,16 @@ function valorOrdenacao(g: GrupoMorte, coluna: ColunaId): string | number {
 type Props = {
   localId: string;
   grupos: GrupoMorte[];
-  animaisAtivos: AnimalAtivo[];
   enfermidades: OpcaoEnfermidade[];
   podeEditar: boolean;
 };
 
-export function TabelaMortes({ localId, grupos, animaisAtivos, enfermidades, podeEditar }: Props) {
+export function TabelaMortes({ localId, grupos, enfermidades, podeEditar }: Props) {
   const [especiesFiltro, setEspeciesFiltro] = useState<Set<string>>(new Set());
   const [causasFiltro, setCausasFiltro] = useState<Set<string>>(new Set());
   const [tratadaFiltro, setTratadaFiltro] = useState<Set<string>>(new Set());
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({ coluna: "data", desc: true });
-  const [selecionadoId, setSelecionadoId] = useState<string | "novo" | null>(null);
+  const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [desfazendo, setDesfazendo] = useState(false);
 
   const grupoMaisRecenteId = useMemo(() => {
@@ -101,11 +101,18 @@ export function TabelaMortes({ localId, grupos, animaisAtivos, enfermidades, pod
   const indiceQuantidade = colunas.findIndex((c) => c.id === "quantidade");
 
   const selecionado =
-    selecionadoId === null
-      ? null
-      : selecionadoId === "novo"
-        ? "novo"
-        : (grupos.find((g) => g.ocorrencia_grupo_id === selecionadoId) ?? null);
+    selecionadoId === null ? null : (grupos.find((g) => g.ocorrencia_grupo_id === selecionadoId) ?? null);
+
+  // Resumos no mesmo recorte da tabela (respeitam os filtros), contando animal
+  // por animal — um registro de 5 cabeças conta 5.
+  const porCategoria = useMemo(
+    () => contar(dados.flatMap((g) => g.animais.map((a) => a.categoria_descricao))),
+    [dados],
+  );
+  const porCausa = useMemo(
+    () => contar(dados.flatMap((g) => g.animais.map(() => g.enfermidade_descricao ?? "Não informada"))),
+    [dados],
+  );
 
   async function desfazer() {
     if (!confirm("Desfazer o registro de morte mais recente? Os animais voltam a ficar ativos.")) return;
@@ -126,15 +133,6 @@ export function TabelaMortes({ localId, grupos, animaisAtivos, enfermidades, pod
         <h1 className="text-xl font-semibold">Mortes</h1>
         <p className="text-sm text-muted-foreground">Registros de perda do rebanho.</p>
       </div>
-
-      {podeEditar && (
-        <div>
-          <Button size="sm" onClick={() => setSelecionadoId("novo")}>
-            <Plus className="size-4" />
-            Registrar morte
-          </Button>
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <FiltroMultiSelecao
@@ -162,6 +160,11 @@ export function TabelaMortes({ localId, grupos, animaisAtivos, enfermidades, pod
           ]}
         />
         <span className="text-sm text-muted-foreground">{dados.length} registro(s)</span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <TabelaResumo titulo="Mortes por categoria" linhas={porCategoria} />
+        <TabelaResumo titulo="Mortes por causa" linhas={porCausa} />
       </div>
 
       {dados.length === 0 ? (
@@ -247,7 +250,6 @@ export function TabelaMortes({ localId, grupos, animaisAtivos, enfermidades, pod
           key={selecionadoId ?? "fechado"}
           localId={localId}
           grupo={selecionado}
-          animaisAtivos={animaisAtivos}
           enfermidades={enfermidades}
           onFechar={() => setSelecionadoId(null)}
         />

@@ -1,6 +1,6 @@
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { TabelaAnimaisVenda } from "./tabela-animais-venda";
+import { NovaVenda } from "./nova-venda";
 import { HistoricoVendas } from "./historico-vendas";
 
 export type Especie = "bovino" | "ovino" | "equino";
@@ -156,7 +156,7 @@ export default async function VendasPage({
   return (
     <div className="flex flex-1 flex-col gap-6">
       <HistoricoVendas localId={localId} vendas={vendas} podeEditar={podeEditar} />
-      <TabelaAnimaisVenda localId={localId} animais={animaisAtivos} podeEditar={podeEditar} />
+      {podeEditar && <NovaVenda localId={localId} animais={animaisAtivos} />}
     </div>
   );
 }

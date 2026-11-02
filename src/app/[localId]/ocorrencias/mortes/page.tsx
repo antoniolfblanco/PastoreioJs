@@ -1,24 +1,20 @@
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import type { AnimalSelecionavel } from "@/components/card-selecao-animais";
 import { TabelaMortes } from "./tabela-mortes";
+import { NovaMorte } from "./nova-morte";
 
 export type Especie = "bovino" | "ovino" | "equino";
 
-export type AnimalAtivo = {
-  id: string;
-  nome: string | null;
-  brinco: string | null;
-  tatuagem: string | null;
-  especie: Especie;
-  area_nome: string;
-  categoria_descricao: string;
-};
+// Mesmo formato do card de seleção compartilhado (Nova venda, Nova morte).
+export type AnimalAtivo = AnimalSelecionavel;
 
 export type MorteAnimal = {
   animal_id: string;
   nome: string | null;
   brinco: string | null;
   tatuagem: string | null;
+  categoria_descricao: string;
 };
 
 export type GrupoMorte = {
@@ -51,7 +47,9 @@ async function buscarAnimaisAtivos(supabase: ClienteServidor, localId: string) {
   while (true) {
     const { data, error } = await supabase
       .from("animais")
-      .select("id, nome, brinco, tatuagem, especie, areas(nome), categorias!categoria_id(descricao)")
+      .select(
+        "id, nome, brinco, tatuagem, especie, sexo, grau_sangue, areas(nome), categorias!categoria_id(descricao), racas(descricao)",
+      )
       .eq("local_id", localId)
       .eq("origem_registro", "proprio")
       .eq("situacao", "ativo")
@@ -84,7 +82,8 @@ export default async function MortesPage({
         .from("ocorrencias_morte")
         .select(
           `ocorrencia_grupo_id, data, especie, enfermidade_id, tratada, responsavel, descricao, observacoes,
-           criado_em, animal_id, enfermidades(descricao), animais(nome, brinco, tatuagem)`,
+           criado_em, animal_id, enfermidades(descricao),
+           animais(nome, brinco, tatuagem, categorias!categoria_id(descricao))`,
         )
         .eq("local_id", localId)
         .eq("desfeita", false)
@@ -103,17 +102,25 @@ export default async function MortesPage({
     area_nome: primeiro(a.areas as { nome: string } | { nome: string }[] | null)?.nome ?? "—",
     categoria_descricao:
       primeiro(a.categorias as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
+    raca_descricao: primeiro(a.racas as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
   })) as unknown as AnimalAtivo[];
 
   const grupos = new Map<string, GrupoMorte>();
   for (const linha of mortesRaw ?? []) {
-    const animalInfo = primeiro(linha.animais as MorteAnimal | MorteAnimal[] | null);
+    type InfoAnimal = {
+      nome: string | null;
+      brinco: string | null;
+      tatuagem: string | null;
+      categorias: { descricao: string } | { descricao: string }[] | null;
+    };
+    const animalInfo = primeiro(linha.animais as InfoAnimal | InfoAnimal[] | null);
     const existente = grupos.get(linha.ocorrencia_grupo_id);
     const animalEntry: MorteAnimal = {
       animal_id: linha.animal_id,
       nome: animalInfo?.nome ?? null,
       brinco: animalInfo?.brinco ?? null,
       tatuagem: animalInfo?.tatuagem ?? null,
+      categoria_descricao: primeiro(animalInfo?.categorias ?? null)?.descricao ?? "Sem categoria",
     };
     if (existente) {
       existente.animais.push(animalEntry);
@@ -136,14 +143,20 @@ export default async function MortesPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-6">
       <TabelaMortes
         localId={localId}
         grupos={Array.from(grupos.values())}
-        animaisAtivos={animaisAtivos}
         enfermidades={(enfermidades as OpcaoEnfermidade[]) ?? []}
         podeEditar={podeEditar}
       />
+      {podeEditar && (
+        <NovaMorte
+          localId={localId}
+          animais={animaisAtivos}
+          enfermidades={(enfermidades as OpcaoEnfermidade[]) ?? []}
+        />
+      )}
     </div>
   );
 }

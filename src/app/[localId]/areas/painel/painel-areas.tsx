@@ -43,9 +43,21 @@ type Props = {
   manejos: ManejoResumo[];
   ciclo: CicloAtivo;
   podeEditar: boolean;
+  // Dentro do card da página inicial: sem o título grande (o card já tem o dele).
+  compacto?: boolean;
 };
 
-export function PainelAreas({ localId, areas, animais, mortes, movimentacoes, manejos, ciclo, podeEditar }: Props) {
+export function PainelAreas({
+  localId,
+  areas,
+  animais,
+  mortes,
+  movimentacoes,
+  manejos,
+  ciclo,
+  podeEditar,
+  compacto = false,
+}: Props) {
   const [especieSelecionada, setEspecieSelecionada] = useState<Especie>("bovino");
   const [chipsAtivos, setChipsAtivos] = useState<Set<ChipId>>(new Set());
   const [areaEditando, setAreaEditando] = useState<Area | null>(null);
@@ -166,12 +178,14 @@ export function PainelAreas({ localId, areas, animais, mortes, movimentacoes, ma
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Painel de Áreas</h1>
-          <p className="text-sm text-muted-foreground">
-            Visão geral do rebanho por área — clique numa área pra ver os animais dela.
-          </p>
-        </div>
+        {!compacto && (
+          <div>
+            <h1 className="text-xl font-semibold">Painel de Áreas</h1>
+            <p className="text-sm text-muted-foreground">
+              Visão geral do rebanho por área — clique numa área pra ver os animais dela.
+            </p>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-1">
           {especies.map((e) => (
             <button
