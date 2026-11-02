@@ -29,11 +29,44 @@ export function DialogoEditarMovimentacao({
   areas: OpcaoArea[];
   onFechar: () => void;
 }) {
+  return (
+    <Dialog open={grupo !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Editar movimentação</DialogTitle>
+        </DialogHeader>
+        {/* A key fica no conteúdo (nunca no DialogContent): remonta ao trocar
+            de movimentação, pra os campos virem preenchidos com a escolhida. */}
+        {grupo && (
+          <ConteudoEditarMovimentacao
+            key={grupo.movimentacao_grupo_id}
+            localId={localId}
+            grupo={grupo}
+            areas={areas}
+            onFechar={onFechar}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConteudoEditarMovimentacao({
+  localId,
+  grupo,
+  areas,
+  onFechar,
+}: {
+  localId: string;
+  grupo: GrupoMovimentacao;
+  areas: OpcaoArea[];
+  onFechar: () => void;
+}) {
   const [resultado, acao, emAndamento] = useActionState(atualizarMovimentacao, undefined);
-  const [areaDestinoId, setAreaDestinoId] = useState(grupo?.area_destino_id ?? "");
-  const [data, setData] = useState(grupo?.data ?? hojeISO);
-  const [responsavel, setResponsavel] = useState(grupo?.responsavel ?? "");
-  const [descricao, setDescricao] = useState(grupo?.descricao ?? "");
+  const [areaDestinoId, setAreaDestinoId] = useState(grupo.area_destino_id);
+  const [data, setData] = useState(grupo.data);
+  const [responsavel, setResponsavel] = useState(grupo.responsavel ?? "");
+  const [descricao, setDescricao] = useState(grupo.descricao ?? "");
 
   useEffect(() => {
     if (resultado === undefined || resultado.erro) return;
@@ -43,78 +76,69 @@ export function DialogoEditarMovimentacao({
   }, [resultado]);
 
   return (
-    <Dialog open={grupo !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Editar movimentação</DialogTitle>
-        </DialogHeader>
-        {grupo && (
-          <form key={grupo.movimentacao_grupo_id} action={acao} className="flex flex-col gap-4">
-            <input type="hidden" name="localId" value={localId} />
-            <input type="hidden" name="grupoId" value={grupo.movimentacao_grupo_id} />
-            <p className="text-sm text-muted-foreground">
-              {grupo.animais.length} animal(is) — não dá pra trocar quais animais fazem parte desta
-              movimentação, só o destino e os dados do evento. Só funciona se nenhum deles tiver sido
-              movido de novo depois.
-            </p>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="areaDestinoEditarMovimentacao">Área de destino</Label>
-              <Select
-                value={areaDestinoId}
-                onValueChange={(v) => setAreaDestinoId(v ?? "")}
-                items={areas.map((a) => ({ value: a.id, label: a.nome }))}
-              >
-                <SelectTrigger id="areaDestinoEditarMovimentacao" className="w-full">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {areas.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <input type="hidden" name="areaDestinoId" value={areaDestinoId} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="dataEditarMovimentacao">Data</Label>
-              <Input
-                id="dataEditarMovimentacao"
-                name="data"
-                type="date"
-                max={hojeISO}
-                value={data}
-                onChange={(e) => setData(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="responsavelEditarMovimentacao">Responsável</Label>
-              <Input
-                id="responsavelEditarMovimentacao"
-                name="responsavel"
-                value={responsavel}
-                onChange={(e) => setResponsavel(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="descricaoEditarMovimentacao">Descrição</Label>
-              <Input
-                id="descricaoEditarMovimentacao"
-                name="descricao"
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-              />
-            </div>
-            {resultado?.erro && <p className="text-sm text-destructive">{resultado.erro}</p>}
-            <DialogFooter>
-              <Button type="submit" disabled={emAndamento || !areaDestinoId}>
-                {emAndamento ? "Salvando..." : "Salvar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+    <form action={acao} className="flex flex-col gap-4">
+      <input type="hidden" name="localId" value={localId} />
+      <input type="hidden" name="grupoId" value={grupo.movimentacao_grupo_id} />
+      <p className="text-sm text-muted-foreground">
+        {grupo.animais.length} animal(is) — não dá pra trocar quais animais fazem parte desta
+        movimentação, só o destino e os dados do evento. Só funciona se nenhum deles tiver sido
+        movido de novo depois.
+      </p>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="areaDestinoEditarMovimentacao">Área de destino</Label>
+        <Select
+          value={areaDestinoId}
+          onValueChange={(v) => setAreaDestinoId(v ?? "")}
+          items={areas.map((a) => ({ value: a.id, label: a.nome }))}
+        >
+          <SelectTrigger id="areaDestinoEditarMovimentacao" className="w-full">
+            <SelectValue placeholder="Selecione" />
+          </SelectTrigger>
+          <SelectContent>
+            {areas.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <input type="hidden" name="areaDestinoId" value={areaDestinoId} />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="dataEditarMovimentacao">Data</Label>
+        <Input
+          id="dataEditarMovimentacao"
+          name="data"
+          type="date"
+          max={hojeISO}
+          value={data}
+          onChange={(e) => setData(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="responsavelEditarMovimentacao">Responsável</Label>
+        <Input
+          id="responsavelEditarMovimentacao"
+          name="responsavel"
+          value={responsavel}
+          onChange={(e) => setResponsavel(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="descricaoEditarMovimentacao">Descrição</Label>
+        <Input
+          id="descricaoEditarMovimentacao"
+          name="descricao"
+          value={descricao}
+          onChange={(e) => setDescricao(e.target.value)}
+        />
+      </div>
+      {resultado?.erro && <p className="text-sm text-destructive">{resultado.erro}</p>}
+      <DialogFooter>
+        <Button type="submit" disabled={emAndamento || !areaDestinoId}>
+          {emAndamento ? "Salvando..." : "Salvar"}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
