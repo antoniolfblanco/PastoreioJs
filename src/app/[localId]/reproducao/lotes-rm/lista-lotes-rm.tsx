@@ -8,6 +8,17 @@ import { DialogoLoteRm } from "./dialogo-lote-rm";
 import { NovosTourosLote } from "./novos-touros-lote";
 import type { CandidatoTouro, LoteRm } from "./page";
 
+function formatarData(data: string) {
+  return new Date(data + "T00:00:00").toLocaleDateString("pt-BR");
+}
+
+function periodo(lote: LoteRm) {
+  if (!lote.data_inicio) return "Sem período — edite o lote pra informar quando os touros foram soltos.";
+  return lote.data_fim
+    ? `Soltos de ${formatarData(lote.data_inicio)} a ${formatarData(lote.data_fim)}`
+    : `Soltos desde ${formatarData(lote.data_inicio)} (ainda no lote)`;
+}
+
 type Props = {
   localId: string;
   lotes: LoteRm[];
@@ -97,10 +108,19 @@ export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) 
                     <span className="ml-2 text-sm text-muted-foreground">
                       {lote.touros.length} {lote.touros.length === 1 ? "touro" : "touros"}
                     </span>
+                    <p
+                      className={
+                        lote.data_inicio
+                          ? "text-sm text-muted-foreground"
+                          : "text-sm text-amber-700 dark:text-amber-400"
+                      }
+                    >
+                      {periodo(lote)}
+                    </p>
                   </div>
                   {podeEditar && (
                     <div className="flex shrink-0 items-center gap-1">
-                      <Button variant="ghost" size="icon" className="size-7" title="Renomear" onClick={() => setSelecionado(lote)}>
+                      <Button variant="ghost" size="icon" className="size-7" title="Editar" onClick={() => setSelecionado(lote)}>
                         <Pencil className="size-4" />
                       </Button>
                       <Button

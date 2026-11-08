@@ -20,7 +20,15 @@ import type { OpcaoRaca } from "../animais/page";
 import { SeletorAnimalParente } from "../reproducao/externos/seletor-animal-parente";
 import type { CandidatoGenealogia } from "../reproducao/externos/page";
 import { formatarData, formatarKg, identificacaoNascido } from "./historico-nascimentos";
-import type { AtivoResumo, CategoriaNascimento, CicloAtivo, Especie, Nascido, OpcaoArea } from "./page";
+import type {
+  AcasalamentoDisponivel,
+  AtivoResumo,
+  CategoriaNascimento,
+  CicloAtivo,
+  Especie,
+  Nascido,
+  OpcaoArea,
+} from "./page";
 
 const especies: { value: Especie; rotulo: string }[] = [
   { value: "bovino", rotulo: "Bovinos" },
@@ -29,6 +37,50 @@ const especies: { value: Especie; rotulo: string }[] = [
 ];
 const rotulosSexo: Record<string, string> = { macho: "Macho", femea: "Fêmea", desconhecido: "Indefinido" };
 const grausSangue = ["PO", "PC", "1/4", "1/2", "SR", "Desconhecido"];
+
+// Duração média da gestação por espécie — só pra sugerir de qual
+// acasalamento o terneiro veio (data do acasalamento + gestação ≈ nascimento).
+const diasGestacao: Record<Especie, number> = { bovino: 283, ovino: 150, equino: 340 };
+// Até quantos dias de diferença da data prevista ainda vale sugerir.
+const FOLGA_SUGESTAO = 45;
+
+const rotulosMetodo: Record<string, string> = {
+  monta_natural: "Monta natural",
+  inseminacao_artificial: "IA",
+  te_fiv: "Embrião (TE/FIV)",
+};
+const rotulosDiagnostico: Record<string, string> = { prenha: "prenha", vazia: "vazia", inconclusivo: "inconclusivo" };
+
+// "Somente a mãe": nascimento ligado à mãe, sem acasalamento.
+const SO_MAE = "so-mae";
+
+function somarDias(data: string, dias: number) {
+  const d = new Date(data + "T00:00:00");
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+function diferencaDias(a: string, b: string) {
+  return Math.round((new Date(a + "T00:00:00").getTime() - new Date(b + "T00:00:00").getTime()) / 86_400_000);
+}
+
+// Janela de quando o acasalamento pode ter acontecido: um dia só (monta com
+// touro, IA, embrião) ou o período do lote RM, onde vale qualquer dia entre
+// os touros serem soltos e retirados (sem retirada = até hoje).
+function janelaAcasalamento(c: AcasalamentoDisponivel): { de: string; ate: string } | null {
+  if (c.rm_lote_inicio) {
+    return { de: c.rm_lote_inicio, ate: c.rm_lote_fim ?? new Date().toISOString().slice(0, 10) };
+  }
+  return c.data ? { de: c.data, ate: c.data } : null;
+}
+
+// O que o terneiro herda do acasalamento, pra mostrar na tela.
+function genealogiaDoAcasalamento(c: AcasalamentoDisponivel, maeEscolhida: string) {
+  const pai = c.touro ?? (c.rm_lote_nome ? `Lote RM ${c.rm_lote_nome}` : null);
+  return c.receptora_id
+    ? { mae: c.femea, pai, receptora: maeEscolhida }
+    : { mae: maeEscolhida, pai, receptora: null };
+}
 
 function hojeISO() {
   return new Date().toISOString().slice(0, 10);
@@ -92,6 +144,7 @@ export function NovoNascimento({
   candidatos,
   nascidos,
   ativos,
+  acasalamentos,
   ciclo,
 }: {
   localId: string;
@@ -101,6 +154,7 @@ export function NovoNascimento({
   candidatos: CandidatoGenealogia[];
   nascidos: Nascido[];
   ativos: AtivoResumo[];
+  acasalamentos: AcasalamentoDisponivel[];
   ciclo: CicloAtivo;
 }) {
   const racaPadrao = racas.find((r) => r.padrao)?.id ?? "";
@@ -133,7 +187,14 @@ export function NovoNascimento({
   const [castrado, setCastrado] = useState(false);
   const [registroProvisorio, setRegistroProvisorio] = useState("");
   const [registroDefinitivo, setRegistroDefinitivo] = useState("");
-  const [seletor, setSeletor] = useState<"mae" | "pai" | "receptora" | null>(null);
+  const [seletor, setSeletor] = useState<"mae" | "pai" | "receptora" | "maeArea" | null>(null);
+  // Individual com acasalamento: a mãe sai da área escolhida e o terneiro
+  // herda a genealogia do acasalamento escolhido. Sem acasalamento: pai/mãe
+  // informados à mão.
+  const [vinculo, setVinculo] = useState<"acasalamento" | "livre">("acasalamento");
+  const [maeArea, setMaeArea] = useState<Parente>(null);
+  // "" = ainda não escolheu → vale o sugerido (ou "somente a mãe" se não houver).
+  const [escolhaAcasalamento, setEscolhaAcasalamento] = useState("");
 
   // Só lote
   const [quantidade, setQuantidade] = useState("1");
@@ -173,12 +234,77 @@ export function NovoNascimento({
   );
   const itensDaArea = itens.filter((i) => i.dados.areaId === areaId);
 
+  // Mães possíveis: fêmeas da espécie que estão hoje na área escolhida.
+  const maesDaArea: CandidatoGenealogia[] = useMemo(
+    () =>
+      ativos
+        .filter((a) => a.area_id === areaId && a.especie === especie && a.sexo === "femea")
+        .map((a) => ({
+          id: a.id,
+          nome: a.nome,
+          brinco: a.brinco,
+          tatuagem: a.tatuagem,
+          sexo: a.sexo,
+          especie: a.especie,
+          raca_descricao: a.categoria_descricao,
+          castrado: false,
+          externo: false,
+        })),
+    [ativos, areaId, especie],
+  );
+
+  // Acasalamentos da mãe escolhida: os dela mesma (monta/IA) e os em que ela
+  // é a receptora de um embrião — dá pra escolher entre um e outro.
+  const acasalamentosDaMae = useMemo(
+    () =>
+      maeArea
+        ? acasalamentos.filter((c) =>
+            c.receptora_id ? c.receptora_id === maeArea.id : c.femea_id === maeArea.id,
+          )
+        : [],
+    [acasalamentos, maeArea],
+  );
+
+  // Sugerido: o acasalamento cuja data + gestação cai mais perto da data de
+  // nascimento informada (dentro da folga), preferindo diagnóstico de prenha.
+  const sugerido = useMemo(() => {
+    if (!data) return null;
+    let melhor: { c: AcasalamentoDisponivel; distancia: number } | null = null;
+    for (const c of acasalamentosDaMae) {
+      const janela = janelaAcasalamento(c);
+      if (!janela || janela.de > data) continue;
+      // Parto previsto: a janela do acasalamento deslocada pela gestação.
+      // Dentro dela a distância é zero; fora, conta até a borda mais perto.
+      const partoDe = somarDias(janela.de, diasGestacao[especie]);
+      const partoAte = somarDias(janela.ate, diasGestacao[especie]);
+      let distancia =
+        data < partoDe ? diferencaDias(partoDe, data) : data > partoAte ? diferencaDias(data, partoAte) : 0;
+      if (distancia > FOLGA_SUGESTAO) continue;
+      if (c.ultimo_diagnostico_resultado === "prenha") distancia -= 10;
+      if (!melhor || distancia < melhor.distancia) melhor = { c, distancia };
+    }
+    return melhor?.c ?? null;
+  }, [acasalamentosDaMae, data, especie]);
+
+  const acasalamentoEfetivo = escolhaAcasalamento || sugerido?.id || SO_MAE;
+  const coberturaEscolhida =
+    acasalamentoEfetivo === SO_MAE ? null : (acasalamentosDaMae.find((c) => c.id === acasalamentoEfetivo) ?? null);
+
   function trocarEspecie(nova: Especie) {
     setEspecie(nova);
     setCategoriaId("");
     setMae(null);
     setPai(null);
     setReceptora(null);
+    setMaeArea(null);
+    setEscolhaAcasalamento("");
+  }
+
+  function trocarArea(nova: string) {
+    setAreaId(nova);
+    // A mãe com acasalamento tem que estar na área — trocou a área, escolhe de novo.
+    setMaeArea(null);
+    setEscolhaAcasalamento("");
   }
 
   function limparIndividuais() {
@@ -195,6 +321,8 @@ export function NovoNascimento({
     setRegistroDefinitivo("");
     setObservacoes("");
     setQuantidade("1");
+    setMaeArea(null);
+    setEscolhaAcasalamento("");
   }
 
   function adicionar() {
@@ -206,7 +334,15 @@ export function NovoNascimento({
 
     const qtd = tipo === "lote" ? Number(quantidade) : 1;
     if (!Number.isInteger(qtd) || qtd < 1) return setErroForm("Informe uma quantidade válida.");
-    if (embriao && !receptora) return setErroForm("Selecione a receptora do embrião.");
+    const comAcasalamento = tipo === "individual" && vinculo === "acasalamento";
+    if (comAcasalamento && !maeArea) return setErroForm("Selecione a mãe.");
+    if (!comAcasalamento && embriao && !receptora) return setErroForm("Selecione a receptora do embrião.");
+    const genealogia =
+      comAcasalamento && maeArea
+        ? coberturaEscolhida
+          ? genealogiaDoAcasalamento(coberturaEscolhida, maeArea.resumo)
+          : { mae: maeArea.resumo, pai: null, receptora: null }
+        : null;
 
     const brincoNormal = brinco.trim().toUpperCase();
     if (tipo === "individual" && brincoNormal) {
@@ -235,9 +371,10 @@ export function NovoNascimento({
         brinco: brincoNormal || null,
         tatuagem: tatuagem.trim() || null,
         pesoNascimento: numero(peso),
-        maeId: mae?.id ?? null,
-        paiId: pai?.id ?? null,
-        receptoraId: embriao ? (receptora?.id ?? null) : null,
+        coberturaId: comAcasalamento ? (coberturaEscolhida?.id ?? null) : null,
+        maeId: comAcasalamento ? (coberturaEscolhida ? null : (maeArea?.id ?? null)) : (mae?.id ?? null),
+        paiId: comAcasalamento ? null : (pai?.id ?? null),
+        receptoraId: comAcasalamento ? null : embriao ? (receptora?.id ?? null) : null,
         castrado: categoria.sexo === "macho" && castrado,
         registroProvisorio: exigeRegistro ? registroProvisorio.trim() || null : null,
         registroDefinitivo: exigeRegistro ? registroDefinitivo.trim() || null : null,
@@ -254,9 +391,9 @@ export function NovoNascimento({
         categoriaDescricao: categoria.descricao,
         sexo: categoria.sexo,
         racaDescricao: racasLocais.find((r) => r.id === racaId)?.descricao ?? "—",
-        mae: individual ? (mae?.resumo ?? null) : null,
-        pai: individual ? (pai?.resumo ?? null) : null,
-        receptora: individual && embriao ? (receptora?.resumo ?? null) : null,
+        mae: genealogia ? genealogia.mae : individual ? (mae?.resumo ?? null) : null,
+        pai: genealogia ? genealogia.pai : individual ? (pai?.resumo ?? null) : null,
+        receptora: genealogia ? genealogia.receptora : individual && embriao ? (receptora?.resumo ?? null) : null,
       },
     ]);
     setProximaChave((c) => c + 1);
@@ -352,7 +489,7 @@ export function NovoNascimento({
           <CardContent className="flex flex-col gap-4">
             <Select
               value={areaId}
-              onValueChange={(v) => setAreaId(v ?? "")}
+              onValueChange={(v) => trocarArea(v ?? "")}
               items={areas.map((a) => ({ value: a.id, label: a.nome }))}
             >
               <SelectTrigger className="w-full">
@@ -439,20 +576,16 @@ export function NovoNascimento({
 
           {tipo === "individual" && (
             <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                disabled
-                title="Em breve"
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-not-allowed opacity-50")}
-              >
-                Com acasalamento
-              </button>
-              <button type="button" className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
-                Sem acasalamento
-              </button>
-              <span className="col-span-2 text-xs text-muted-foreground">
-                Com acasalamento (vincular à gestação confirmada) em breve.
-              </span>
+              {(["acasalamento", "livre"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setVinculo(v)}
+                  className={cn(buttonVariants({ variant: vinculo === v ? "secondary" : "outline", size: "sm" }))}
+                >
+                  {v === "acasalamento" ? "Com acasalamento" : "Sem acasalamento"}
+                </button>
+              ))}
             </div>
           )}
 
@@ -460,6 +593,94 @@ export function NovoNascimento({
             <Label htmlFor="dataNascimento">Data de nascimento</Label>
             <Input id="dataNascimento" type="date" max={hojeISO()} value={data} onChange={(e) => setData(e.target.value)} />
           </div>
+
+          {tipo === "individual" && vinculo === "acasalamento" && (
+            <>
+              <CampoParente
+                rotulo={`Mãe (${maesDaArea.length} fêmea(s) na área)`}
+                valor={maeArea}
+                onBuscar={() => setSeletor("maeArea")}
+                onLimpar={() => {
+                  setMaeArea(null);
+                  setEscolhaAcasalamento("");
+                }}
+              />
+              {maeArea && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>Acasalamento</Label>
+                  <div className="flex flex-col gap-1">
+                    {acasalamentosDaMae.map((c) => {
+                      const g = genealogiaDoAcasalamento(c, maeArea.resumo);
+                      const janela = janelaAcasalamento(c);
+                      const previstoDe = janela ? somarDias(janela.de, diasGestacao[especie]) : null;
+                      const previstoAte = janela ? somarDias(janela.ate, diasGestacao[especie]) : null;
+                      const escolhido = acasalamentoEfetivo === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setEscolhaAcasalamento(c.id)}
+                          className={cn(
+                            "flex flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs",
+                            escolhido ? "border-primary bg-secondary text-secondary-foreground" : "bg-background hover:bg-muted",
+                          )}
+                        >
+                          <span className="flex flex-wrap items-center gap-1 text-sm font-medium">
+                            {c.receptora_id ? `Embrião: ${c.femea} × ${g.pai ?? "—"}` : `${rotulosMetodo[c.metodo] ?? c.metodo}: ${g.pai ?? "—"}`}
+                            {sugerido?.id === c.id && <Badge variant="outline">Sugerido</Badge>}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {c.rm_lote_inicio
+                              ? `Lote solto ${formatarData(c.rm_lote_inicio)}${c.rm_lote_fim ? ` a ${formatarData(c.rm_lote_fim)}` : " (ainda solto)"}`
+                              : formatarData(c.data)}
+                            {c.evento_nome ? ` · ${c.evento_nome}` : ""}
+                            {c.ultimo_diagnostico_resultado
+                              ? ` · ${rotulosDiagnostico[c.ultimo_diagnostico_resultado] ?? c.ultimo_diagnostico_resultado}`
+                              : ""}
+                          </span>
+                          {previstoDe && (
+                            <span className="text-muted-foreground">
+                              {previstoDe === previstoAte
+                                ? `Parto previsto ≈ ${formatarData(previstoDe)}`
+                                : `Parto previsto entre ${formatarData(previstoDe)} e ${formatarData(previstoAte)}`}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setEscolhaAcasalamento(SO_MAE)}
+                      className={cn(
+                        "rounded-md border px-2 py-1.5 text-left text-sm",
+                        acasalamentoEfetivo === SO_MAE
+                          ? "border-primary bg-secondary font-medium text-secondary-foreground"
+                          : "bg-background hover:bg-muted",
+                      )}
+                    >
+                      Informar somente a mãe
+                    </button>
+                  </div>
+                  {acasalamentosDaMae.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      Nenhum acasalamento confirmado (e ainda sem parto) pra essa fêmea.
+                    </span>
+                  ) : (
+                    !sugerido && (
+                      <span className="text-xs text-muted-foreground">
+                        Nenhum acasalamento bate com a data de nascimento — escolha um ou informe só a mãe.
+                      </span>
+                    )
+                  )}
+                  {coberturaEscolhida?.receptora_id && (
+                    <span className="text-xs text-muted-foreground">
+                      Filho do embrião: mãe biológica {coberturaEscolhida.femea}, {maeArea.resumo} como receptora.
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="categoriaNascimento">Categoria</Label>
@@ -538,31 +759,35 @@ export function NovoNascimento({
                 </div>
               </div>
 
-              <CampoParente
-                rotulo={embriao ? "Mãe biológica (doadora)" : "Mãe"}
-                valor={mae}
-                onBuscar={() => setSeletor("mae")}
-                onLimpar={() => setMae(null)}
-              />
-              <CampoParente rotulo="Pai" valor={pai} onBuscar={() => setSeletor("pai")} onLimpar={() => setPai(null)} />
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="embriaoNascimento"
-                  checked={embriao}
-                  onCheckedChange={(v) => {
-                    setEmbriao(v === true);
-                    if (v !== true) setReceptora(null);
-                  }}
-                />
-                <Label htmlFor="embriaoNascimento">Origem de embrião (TE/FIV)</Label>
-              </div>
-              {embriao && (
-                <CampoParente
-                  rotulo="Receptora (quem gestou)"
-                  valor={receptora}
-                  onBuscar={() => setSeletor("receptora")}
-                  onLimpar={() => setReceptora(null)}
-                />
+              {vinculo === "livre" && (
+                <>
+                  <CampoParente
+                    rotulo={embriao ? "Mãe biológica (doadora)" : "Mãe"}
+                    valor={mae}
+                    onBuscar={() => setSeletor("mae")}
+                    onLimpar={() => setMae(null)}
+                  />
+                  <CampoParente rotulo="Pai" valor={pai} onBuscar={() => setSeletor("pai")} onLimpar={() => setPai(null)} />
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="embriaoNascimento"
+                      checked={embriao}
+                      onCheckedChange={(v) => {
+                        setEmbriao(v === true);
+                        if (v !== true) setReceptora(null);
+                      }}
+                    />
+                    <Label htmlFor="embriaoNascimento">Origem de embrião (TE/FIV)</Label>
+                  </div>
+                  {embriao && (
+                    <CampoParente
+                      rotulo="Receptora (quem gestou)"
+                      valor={receptora}
+                      onBuscar={() => setSeletor("receptora")}
+                      onLimpar={() => setReceptora(null)}
+                    />
+                  )}
+                </>
               )}
             </>
           )}
@@ -732,6 +957,17 @@ export function NovoNascimento({
         sexo="macho"
         candidatos={candidatosDaEspecie}
         onSelecionar={(id, resumo) => setPai({ id, resumo })}
+        onFechar={() => setSeletor(null)}
+      />
+      <SeletorAnimalParente
+        aberto={seletor === "maeArea"}
+        titulo={`Mães em ${area?.nome ?? "—"}`}
+        sexo="femea"
+        candidatos={maesDaArea}
+        onSelecionar={(id, resumo) => {
+          setMaeArea({ id, resumo });
+          setEscolhaAcasalamento("");
+        }}
         onFechar={() => setSeletor(null)}
       />
       {/* Receptora é sempre do rebanho próprio — quem gestou está no campo. */}

@@ -162,6 +162,18 @@ export function ManejoAcasalamento({
     setErroForm(undefined);
   }
 
+  // Escolheu o lote RM: a data do acasalamento vai pro início do lote (é o
+  // dia em que os touros foram soltos — qualquer dia do período vale).
+  function escolherLoteRm(id: string) {
+    setRmLoteId(id);
+    const lote = lotesRm.find((l) => l.id === id);
+    if (lote?.data_inicio && (data < lote.data_inicio || (lote.data_fim && data > lote.data_fim))) {
+      setData(lote.data_inicio);
+    }
+  }
+
+  const loteRmEscolhido = lotesRm.find((l) => l.id === rmLoteId);
+
   function alternar(id: string) {
     setMarcados((atual) => {
       const novo = new Set(atual);
@@ -200,6 +212,11 @@ export function ManejoAcasalamento({
       } else if (usarLoteRm) {
         const lote = lotesRm.find((l) => l.id === rmLoteId);
         if (!lote) return setErroForm("Selecione o lote RM.");
+        // Monta em lote: a data tem que cair dentro do período do lote.
+        if (lote.data_inicio && data < lote.data_inicio)
+          return setErroForm(`O lote ${lote.nome} só foi solto em ${formatarData(lote.data_inicio)}.`);
+        if (lote.data_fim && data > lote.data_fim)
+          return setErroForm(`O lote ${lote.nome} foi retirado em ${formatarData(lote.data_fim)}.`);
         descricao = `Lote RM ${lote.nome}`;
       } else {
         const touro = candidatos.find((c) => c.id === touroId);
@@ -469,7 +486,7 @@ export function ManejoAcasalamento({
                     ) : (
                       <Select
                         value={rmLoteId}
-                        onValueChange={(v) => setRmLoteId(v ?? "")}
+                        onValueChange={(v) => escolherLoteRm(v ?? "")}
                         items={lotesRm.map((l) => ({ value: l.id, label: l.nome }))}
                       >
                         <SelectTrigger id="loteRmLote" className="w-full">
@@ -555,10 +572,22 @@ export function ManejoAcasalamento({
             <Input
               id="dataLoteReprodutivo"
               type="date"
-              max={hojeISO()}
+              min={operacao === "acasalamento" && usarLoteRm ? (loteRmEscolhido?.data_inicio ?? undefined) : undefined}
+              max={
+                operacao === "acasalamento" && usarLoteRm && loteRmEscolhido?.data_fim
+                  ? loteRmEscolhido.data_fim
+                  : hojeISO()
+              }
               value={data}
               onChange={(e) => setData(e.target.value)}
             />
+            {operacao === "acasalamento" && usarLoteRm && loteRmEscolhido && (
+              <span className="text-xs text-muted-foreground">
+                {loteRmEscolhido.data_inicio
+                  ? `Lote solto ${loteRmEscolhido.data_fim ? `de ${formatarData(loteRmEscolhido.data_inicio)} a ${formatarData(loteRmEscolhido.data_fim)}` : `desde ${formatarData(loteRmEscolhido.data_inicio)}`} — qualquer dia do período vale.`
+                  : "Este lote não tem período cadastrado — informe em Lotes RM."}
+              </span>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="responsavelLoteReprodutivo">Responsável</Label>

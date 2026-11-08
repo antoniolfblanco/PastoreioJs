@@ -22,10 +22,18 @@ export async function salvarLoteRm(
   const nome = (formData.get("nome") as string)?.trim();
   if (!nome) return { erro: "Informe o nome do lote." };
 
+  // Período em que os touros ficam soltos: o acasalamento por lote RM vale
+  // pra qualquer dia dentro dele. Sem data de fim, o lote está solto ainda.
+  const dataInicio = (formData.get("dataInicio") as string) || null;
+  const dataFim = (formData.get("dataFim") as string) || null;
+  if (!dataInicio) return { erro: "Informe a data em que os touros foram soltos." };
+  if (dataFim && dataFim < dataInicio) return { erro: "A data de fim não pode ser antes do início." };
+
+  const dados = { nome, data_inicio: dataInicio, data_fim: dataFim };
   const supabase = await criarClienteServidor();
   const { data, error } = id
-    ? await supabase.from("lotes_rm").update({ nome }).eq("id", id).select("id").single()
-    : await supabase.from("lotes_rm").insert({ local_id: localId, nome }).select("id").single();
+    ? await supabase.from("lotes_rm").update(dados).eq("id", id).select("id").single()
+    : await supabase.from("lotes_rm").insert({ local_id: localId, ...dados }).select("id").single();
 
   if (error) return { erro: "Não foi possível salvar: " + error.message };
 

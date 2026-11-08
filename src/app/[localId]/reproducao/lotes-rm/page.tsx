@@ -13,6 +13,8 @@ export type TouroDoLote = {
 export type LoteRm = {
   id: string;
   nome: string;
+  data_inicio: string | null;
+  data_fim: string | null;
   touros: TouroDoLote[];
 };
 
@@ -44,7 +46,7 @@ export default async function LotesRmPage({
     { data: lotesRaw, error: erroLotes },
     { data: candidatosRaw, error: erroCandidatos },
   ] = await Promise.all([
-    supabase.from("lotes_rm").select("id, nome").eq("local_id", localId).eq("ativo", true).order("nome"),
+    supabase.from("lotes_rm").select("id, nome, data_inicio, data_fim").eq("local_id", localId).eq("ativo", true).order("nome"),
     supabase
       .from("animais")
       .select(
@@ -103,6 +105,8 @@ export default async function LotesRmPage({
   const lotes: LoteRm[] = (lotesRaw ?? []).map((l) => ({
     id: l.id,
     nome: l.nome,
+    data_inicio: l.data_inicio,
+    data_fim: l.data_fim,
     touros: tourosPorLote.get(l.id) ?? [],
   }));
 

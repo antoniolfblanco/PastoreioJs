@@ -49,7 +49,7 @@ export type CandidatoAnimal = {
   externo: boolean;
 };
 
-export type LoteRmOpcao = { id: string; nome: string };
+export type LoteRmOpcao = { id: string; nome: string; data_inicio: string | null; data_fim: string | null };
 
 export type LoteEmbriaoOpcao = {
   id: string;
@@ -117,7 +117,7 @@ export default async function EventoReprodutivoDetalhePage({
       // outra posição na tabela a cada UPDATE.
       .order("criado_em", { ascending: false })
       .order("id", { ascending: true }),
-    supabase.from("lotes_rm").select("id, nome").eq("local_id", localId).eq("ativo", true).order("nome"),
+    supabase.from("lotes_rm").select("id, nome, data_inicio, data_fim").eq("local_id", localId).eq("ativo", true).order("nome"),
     supabase
       .from("banco_embrioes")
       .select(

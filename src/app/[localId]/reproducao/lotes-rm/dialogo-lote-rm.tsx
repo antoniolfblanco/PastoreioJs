@@ -29,7 +29,7 @@ export function DialogoLoteRm({
     <Dialog open={lote !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{existente ? "Renomear lote" : "Novo lote RM"}</DialogTitle>
+          <DialogTitle>{existente ? "Editar lote RM" : "Novo lote RM"}</DialogTitle>
         </DialogHeader>
         {lote && (
           <form key={existente?.id ?? "novo"} action={acao} className="flex flex-col gap-4">
@@ -46,6 +46,26 @@ export function DialogoLoteRm({
                 defaultValue={existente?.nome}
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="inicioLoteRm">Touros soltos em</Label>
+                <Input
+                  id="inicioLoteRm"
+                  name="dataInicio"
+                  type="date"
+                  required
+                  defaultValue={existente?.data_inicio ?? ""}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="fimLoteRm">Retirados em (opcional)</Label>
+                <Input id="fimLoteRm" name="dataFim" type="date" defaultValue={existente?.data_fim ?? ""} />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O acasalamento por este lote vale pra qualquer dia dentro do período. Sem data de retirada, o lote conta
+              como ainda solto.
+            </p>
             {resultado?.erro && <p className="text-sm text-destructive">{resultado.erro}</p>}
             <DialogFooter>
               <Button type="submit" disabled={emAndamento}>

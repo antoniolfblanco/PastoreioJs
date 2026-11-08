@@ -21,6 +21,10 @@ export type ItemNascimento = {
   observacoes: string | null;
   valor: number | null;
   // Só individual:
+  // Acasalamento de onde veio (cobertura confirmada). Preenchido, a
+  // genealogia sai dele — mãe, pai/lote RM e receptora — e os campos
+  // maeId/paiId/receptoraId abaixo são ignorados.
+  coberturaId?: string | null;
   nome?: string | null;
   brinco?: string | null;
   tatuagem?: string | null;
@@ -52,6 +56,25 @@ export async function registrarNascimentos(localId: string, itens: ItemNasciment
   if (erroCategorias) return { error: "Não foi possível conferir as categorias: " + erroCategorias.message };
   const categoriaPorId = new Map((categorias ?? []).map((c) => [c.id, c]));
 
+  // Acasalamentos citados: confere que são do local e confirmados, e pega a
+  // genealogia de cada um (mesmos campos que a RPC registrar_nascimento usa).
+  const idsCoberturas = Array.from(
+    new Set(itens.map((i) => (i.tipo === "individual" ? i.coberturaId : null)).filter((id): id is string => !!id)),
+  );
+  const coberturaPorId = new Map<
+    string,
+    { femea_id: string; touro_id: string | null; rm_lote_id: string | null; receptora_id: string | null }
+  >();
+  if (idsCoberturas.length > 0) {
+    const { data: coberturas, error: erroCoberturas } = await supabase
+      .from("coberturas_detalhe")
+      .select("id, femea_id, touro_id, rm_lote_id, receptora_id, confirmada")
+      .eq("local_id", localId)
+      .in("id", idsCoberturas);
+    if (erroCoberturas) return { error: "Não foi possível conferir os acasalamentos: " + erroCoberturas.message };
+    for (const c of coberturas ?? []) if (c.confirmada) coberturaPorId.set(c.id, c);
+  }
+
   const linhas: Record<string, unknown>[] = [];
   for (const item of itens) {
     const categoria = categoriaPorId.get(item.categoriaId);
@@ -63,6 +86,10 @@ export async function registrarNascimentos(localId: string, itens: ItemNasciment
 
     const exigeRegistro = grauSangueExigeRegistro(item.grauSangue);
     const individual = item.tipo === "individual";
+    const cobertura = individual && item.coberturaId ? coberturaPorId.get(item.coberturaId) : undefined;
+    if (individual && item.coberturaId && !cobertura) {
+      return { error: "Um dos acasalamentos escolhidos não existe mais ou não está confirmado." };
+    }
     const linha = {
       local_id: localId,
       area_id: item.areaId,
@@ -83,9 +110,11 @@ export async function registrarNascimentos(localId: string, itens: ItemNasciment
       brinco: individual ? item.brinco?.trim().toUpperCase() || null : null,
       tatuagem: individual ? item.tatuagem?.trim() || null : null,
       peso_nascimento: individual ? (item.pesoNascimento ?? null) : null,
-      mae_id: individual ? item.maeId || null : null,
-      pai_id: individual ? item.paiId || null : null,
-      receptora_id: individual ? item.receptoraId || null : null,
+      mae_id: cobertura ? cobertura.femea_id : individual ? item.maeId || null : null,
+      pai_id: cobertura ? cobertura.touro_id : individual ? item.paiId || null : null,
+      pai_rm_lote_id: cobertura ? cobertura.rm_lote_id : null,
+      receptora_id: cobertura ? cobertura.receptora_id : individual ? item.receptoraId || null : null,
+      cobertura_id: cobertura ? item.coberturaId : null,
       castrado: individual && categoria.sexo === "macho" && !!item.castrado,
       registro_provisorio: individual && exigeRegistro ? item.registroProvisorio?.trim() || null : null,
       registro_definitivo: individual && exigeRegistro ? item.registroDefinitivo?.trim() || null : null,

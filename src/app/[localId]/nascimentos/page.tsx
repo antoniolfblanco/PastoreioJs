@@ -30,7 +30,40 @@ export type Nascido = {
 };
 
 // Animal ativo só pro resumo por categoria da área escolhida.
-export type AtivoResumo = { area_id: string; especie: Especie; categoria_descricao: string };
+// Animal ativo da área: serve pro resumo por categoria e pra listar as mães
+// possíveis no nascimento com acasalamento.
+export type AtivoResumo = {
+  id: string;
+  nome: string | null;
+  brinco: string | null;
+  tatuagem: string | null;
+  sexo: Sexo;
+  area_id: string;
+  especie: Especie;
+  categoria_descricao: string;
+};
+
+// Acasalamento confirmado que ainda não pariu — candidato a "de onde veio" o
+// terneiro. A fêmea do campo pode ser a própria mãe (monta/IA) ou a
+// receptora de um embrião (TE/FIV), quando receptora_id vem preenchido.
+export type AcasalamentoDisponivel = {
+  id: string;
+  data: string | null;
+  metodo: string;
+  evento_nome: string | null;
+  estacao_nome: string | null;
+  femea_id: string;
+  femea: string;
+  touro: string | null;
+  rm_lote_nome: string | null;
+  // Período do lote RM (monta em lote): a cobertura pode ter sido em
+  // qualquer dia dentro dele, então o parto previsto vira uma janela.
+  rm_lote_inicio: string | null;
+  rm_lote_fim: string | null;
+  receptora_id: string | null;
+  ultimo_diagnostico_resultado: string | null;
+  ultimo_diagnostico_data: string | null;
+};
 
 export type OpcaoArea = { id: string; nome: string };
 export type CategoriaNascimento = { id: string; descricao: string; especie: Especie; sexo: Sexo };
@@ -105,17 +138,74 @@ async function buscarAtivos(supabase: ClienteServidor, localId: string): Promise
   const linhas = await paginar((de, ate) =>
     supabase
       .from("animais")
-      .select("area_id, especie, categorias!categoria_id(descricao)")
+      .select("id, nome, brinco, tatuagem, sexo, area_id, especie, categorias!categoria_id(descricao)")
       .eq("local_id", localId)
       .eq("origem_registro", "proprio")
       .eq("situacao", "ativo")
       .range(de, ate),
   );
   return linhas.map((a) => ({
+    id: a.id as string,
+    nome: a.nome as string | null,
+    brinco: a.brinco as string | null,
+    tatuagem: a.tatuagem as string | null,
+    sexo: a.sexo as Sexo,
     area_id: a.area_id as string,
     especie: a.especie as Especie,
     categoria_descricao:
       primeiro(a.categorias as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
+  }));
+}
+
+async function buscarAcasalamentos(supabase: ClienteServidor, localId: string): Promise<AcasalamentoDisponivel[]> {
+  const linhas = await paginar((de, ate) =>
+    supabase
+      .from("coberturas_detalhe")
+      .select(
+        `id, data, metodo, evento_nome, estacao_nome, femea_id, femea_nome, femea_brinco, femea_tatuagem,
+         touro_nome, touro_brinco, touro_tatuagem, rm_lote_id, rm_lote_nome, receptora_id,
+         ultimo_diagnostico_resultado, ultimo_diagnostico_data`,
+      )
+      .eq("local_id", localId)
+      .eq("confirmada", true)
+      .eq("pariu", false)
+      .order("data", { ascending: false })
+      .range(de, ate),
+  );
+  const { data: lotes, error } = await supabase
+    .from("lotes_rm")
+    .select("id, data_inicio, data_fim")
+    .eq("local_id", localId);
+  if (error) throw new Error(error.message);
+  const periodoPorLote = new Map((lotes ?? []).map((l) => [l.id, l]));
+
+  return linhas.map((c) => ({
+    id: c.id as string,
+    data: c.data as string | null,
+    metodo: c.metodo as string,
+    rm_lote_inicio: c.rm_lote_id ? (periodoPorLote.get(c.rm_lote_id as string)?.data_inicio ?? null) : null,
+    rm_lote_fim: c.rm_lote_id ? (periodoPorLote.get(c.rm_lote_id as string)?.data_fim ?? null) : null,
+    evento_nome: c.evento_nome as string | null,
+    estacao_nome: c.estacao_nome as string | null,
+    femea_id: c.femea_id as string,
+    femea:
+      identificacao({
+        nome: c.femea_nome as string | null,
+        brinco: c.femea_brinco as string | null,
+        tatuagem: c.femea_tatuagem as string | null,
+      }) ?? "—",
+    touro:
+      c.touro_nome || c.touro_brinco || c.touro_tatuagem
+        ? identificacao({
+            nome: c.touro_nome as string | null,
+            brinco: c.touro_brinco as string | null,
+            tatuagem: c.touro_tatuagem as string | null,
+          })
+        : null,
+    rm_lote_nome: c.rm_lote_nome as string | null,
+    receptora_id: c.receptora_id as string | null,
+    ultimo_diagnostico_resultado: c.ultimo_diagnostico_resultado as string | null,
+    ultimo_diagnostico_data: c.ultimo_diagnostico_data as string | null,
   }));
 }
 
@@ -168,6 +258,7 @@ export default async function NascimentosPage({
     nascidos,
     ativos,
     candidatos,
+    acasalamentos,
     { data: areas, error: erroAreas },
     { data: categoriasRaw, error: erroCategorias },
     { data: racas, error: erroRacas },
@@ -176,6 +267,7 @@ export default async function NascimentosPage({
     buscarNascidos(supabase, localId),
     buscarAtivos(supabase, localId),
     buscarCandidatos(supabase, localId),
+    buscarAcasalamentos(supabase, localId),
     supabase.from("areas").select("id, nome").eq("local_id", localId).eq("ativo", true).order("ordem").order("nome"),
     // Só categorias cuja categoria IVZ é válida pra nascimento (mesmo filtro do app).
     supabase
@@ -215,6 +307,7 @@ export default async function NascimentosPage({
           candidatos={candidatos}
           nascidos={nascidos}
           ativos={ativos}
+          acasalamentos={acasalamentos}
           ciclo={(ciclo as CicloAtivo) ?? null}
         />
       )}
