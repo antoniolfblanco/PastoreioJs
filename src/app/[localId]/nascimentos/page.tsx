@@ -60,6 +60,9 @@ export type AcasalamentoDisponivel = {
   // qualquer dia dentro dele, então o parto previsto vira uma janela.
   rm_lote_inicio: string | null;
   rm_lote_fim: string | null;
+  // Período do evento de monta natural (touro solto → retirado).
+  evento_inicio: string | null;
+  evento_fim: string | null;
   receptora_id: string | null;
   ultimo_diagnostico_resultado: string | null;
   ultimo_diagnostico_data: string | null;
@@ -162,7 +165,7 @@ async function buscarAcasalamentos(supabase: ClienteServidor, localId: string): 
     supabase
       .from("coberturas_detalhe")
       .select(
-        `id, data, metodo, evento_nome, estacao_nome, femea_id, femea_nome, femea_brinco, femea_tatuagem,
+        `id, data, metodo, evento_id, evento_nome, estacao_nome, femea_id, femea_nome, femea_brinco, femea_tatuagem,
          touro_nome, touro_brinco, touro_tatuagem, rm_lote_id, rm_lote_nome, receptora_id,
          ultimo_diagnostico_resultado, ultimo_diagnostico_data`,
       )
@@ -179,12 +182,21 @@ async function buscarAcasalamentos(supabase: ClienteServidor, localId: string): 
   if (error) throw new Error(error.message);
   const periodoPorLote = new Map((lotes ?? []).map((l) => [l.id, l]));
 
+  const { data: eventos, error: erroEventos } = await supabase
+    .from("eventos_reprodutivos")
+    .select("id, data_inicio, data_fim")
+    .eq("local_id", localId);
+  if (erroEventos) throw new Error(erroEventos.message);
+  const periodoPorEvento = new Map((eventos ?? []).map((e) => [e.id, e]));
+
   return linhas.map((c) => ({
     id: c.id as string,
     data: c.data as string | null,
     metodo: c.metodo as string,
     rm_lote_inicio: c.rm_lote_id ? (periodoPorLote.get(c.rm_lote_id as string)?.data_inicio ?? null) : null,
     rm_lote_fim: c.rm_lote_id ? (periodoPorLote.get(c.rm_lote_id as string)?.data_fim ?? null) : null,
+    evento_inicio: c.evento_id ? (periodoPorEvento.get(c.evento_id as string)?.data_inicio ?? null) : null,
+    evento_fim: c.evento_id ? (periodoPorEvento.get(c.evento_id as string)?.data_fim ?? null) : null,
     evento_nome: c.evento_nome as string | null,
     estacao_nome: c.estacao_nome as string | null,
     femea_id: c.femea_id as string,

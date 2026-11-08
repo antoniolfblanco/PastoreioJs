@@ -19,6 +19,7 @@ export type Evento = {
   metodo: Metodo;
   especie: Especie;
   data_inicio: string;
+  data_fim: string | null;
 };
 
 export type ResultadoDiagnostico = "prenha" | "vazia" | "inconclusivo";
@@ -59,7 +60,7 @@ export default async function EventosReprodutivosPage({
     supabase.from("estacoes_reprodutivas").select("id, nome, ativo, especie").eq("local_id", localId),
     supabase
       .from("eventos_reprodutivos")
-      .select("id, estacao_id, nome, metodo, especie, data_inicio")
+      .select("id, estacao_id, nome, metodo, especie, data_inicio, data_fim")
       .eq("local_id", localId)
       .order("data_inicio", { ascending: false }),
     supabase

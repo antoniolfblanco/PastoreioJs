@@ -174,6 +174,20 @@ export function ManejoAcasalamento({
 
   const loteRmEscolhido = lotesRm.find((l) => l.id === rmLoteId);
 
+  // Período em que a data do acasalamento pode cair: o do lote RM escolhido,
+  // ou — monta natural com touro — o do próprio evento (solto → retirado).
+  const montaNaturalTouro = evento.metodo === "monta_natural" && !usarLoteRm;
+  const periodo =
+    operacao !== "acasalamento"
+      ? null
+      : usarLoteRm
+        ? loteRmEscolhido?.data_inicio
+          ? { de: loteRmEscolhido.data_inicio, ate: loteRmEscolhido.data_fim, nome: `O lote ${loteRmEscolhido.nome}` }
+          : null
+        : montaNaturalTouro
+          ? { de: evento.data_inicio, ate: evento.data_fim, nome: "O evento" }
+          : null;
+
   function alternar(id: string) {
     setMarcados((atual) => {
       const novo = new Set(atual);
@@ -221,6 +235,10 @@ export function ManejoAcasalamento({
       } else {
         const touro = candidatos.find((c) => c.id === touroId);
         if (!touro) return setErroForm("Selecione o touro.");
+        if (montaNaturalTouro && data < evento.data_inicio)
+          return setErroForm(`O touro só foi solto em ${formatarData(evento.data_inicio)}.`);
+        if (montaNaturalTouro && evento.data_fim && data > evento.data_fim)
+          return setErroForm(`O touro foi retirado em ${formatarData(evento.data_fim)}.`);
         descricao = `${isIa ? "IA com " : "Touro "}${[touro.brinco, touro.tatuagem, touro.nome].filter(Boolean).join(" • ")}`;
       }
       setItens((atual) => [
@@ -572,20 +590,20 @@ export function ManejoAcasalamento({
             <Input
               id="dataLoteReprodutivo"
               type="date"
-              min={operacao === "acasalamento" && usarLoteRm ? (loteRmEscolhido?.data_inicio ?? undefined) : undefined}
-              max={
-                operacao === "acasalamento" && usarLoteRm && loteRmEscolhido?.data_fim
-                  ? loteRmEscolhido.data_fim
-                  : hojeISO()
-              }
+              min={periodo?.de}
+              max={periodo?.ate ?? hojeISO()}
               value={data}
               onChange={(e) => setData(e.target.value)}
             />
-            {operacao === "acasalamento" && usarLoteRm && loteRmEscolhido && (
+            {periodo && (
               <span className="text-xs text-muted-foreground">
-                {loteRmEscolhido.data_inicio
-                  ? `Lote solto ${loteRmEscolhido.data_fim ? `de ${formatarData(loteRmEscolhido.data_inicio)} a ${formatarData(loteRmEscolhido.data_fim)}` : `desde ${formatarData(loteRmEscolhido.data_inicio)}`} — qualquer dia do período vale.`
-                  : "Este lote não tem período cadastrado — informe em Lotes RM."}
+                {periodo.nome} vai {periodo.ate ? `de ${formatarData(periodo.de)} a ${formatarData(periodo.ate)}` : `desde ${formatarData(periodo.de)}`}{" "}
+                — qualquer dia do período vale.
+              </span>
+            )}
+            {operacao === "acasalamento" && usarLoteRm && loteRmEscolhido && !loteRmEscolhido.data_inicio && (
+              <span className="text-xs text-muted-foreground">
+                Este lote não tem período cadastrado — informe em Lotes RM.
               </span>
             )}
           </div>

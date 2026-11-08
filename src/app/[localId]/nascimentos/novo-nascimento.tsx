@@ -68,9 +68,10 @@ function diferencaDias(a: string, b: string) {
 // touro, IA, embrião) ou o período do lote RM, onde vale qualquer dia entre
 // os touros serem soltos e retirados (sem retirada = até hoje).
 function janelaAcasalamento(c: AcasalamentoDisponivel): { de: string; ate: string } | null {
-  if (c.rm_lote_inicio) {
-    return { de: c.rm_lote_inicio, ate: c.rm_lote_fim ?? new Date().toISOString().slice(0, 10) };
-  }
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (c.rm_lote_inicio) return { de: c.rm_lote_inicio, ate: c.rm_lote_fim ?? hoje };
+  // Monta natural com touro: o período do evento (touro solto → retirado).
+  if (c.metodo === "monta_natural" && c.evento_inicio) return { de: c.evento_inicio, ate: c.evento_fim ?? hoje };
   return c.data ? { de: c.data, ate: c.data } : null;
 }
 
@@ -632,7 +633,9 @@ export function NovoNascimento({
                           <span className="text-muted-foreground">
                             {c.rm_lote_inicio
                               ? `Lote solto ${formatarData(c.rm_lote_inicio)}${c.rm_lote_fim ? ` a ${formatarData(c.rm_lote_fim)}` : " (ainda solto)"}`
-                              : formatarData(c.data)}
+                              : c.metodo === "monta_natural" && c.evento_inicio
+                                ? `Touro solto ${formatarData(c.evento_inicio)}${c.evento_fim ? ` a ${formatarData(c.evento_fim)}` : " (ainda solto)"}`
+                                : formatarData(c.data)}
                             {c.evento_nome ? ` · ${c.evento_nome}` : ""}
                             {c.ultimo_diagnostico_resultado
                               ? ` · ${rotulosDiagnostico[c.ultimo_diagnostico_resultado] ?? c.ultimo_diagnostico_resultado}`

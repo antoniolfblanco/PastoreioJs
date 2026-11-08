@@ -16,6 +16,7 @@ export type Evento = {
   metodo: Metodo;
   especie: Especie;
   data_inicio: string;
+  data_fim: string | null;
   estacao_id: string;
   estacao_nome: string;
 };
@@ -78,7 +79,7 @@ export default async function EventoReprodutivoDetalhePage({
   const supabase = await criarClienteServidor();
   const { data: eventoRaw, error: erroEvento } = await supabase
     .from("eventos_reprodutivos")
-    .select("id, nome, metodo, especie, data_inicio, estacao_id, estacoes_reprodutivas(nome)")
+    .select("id, nome, metodo, especie, data_inicio, data_fim, estacao_id, estacoes_reprodutivas(nome)")
     .eq("id", eventoId)
     .eq("local_id", localId)
     .maybeSingle();
@@ -92,6 +93,7 @@ export default async function EventoReprodutivoDetalhePage({
     metodo: eventoRaw.metodo as Metodo,
     especie: eventoRaw.especie as Especie,
     data_inicio: eventoRaw.data_inicio,
+    data_fim: eventoRaw.data_fim,
     estacao_id: eventoRaw.estacao_id,
     estacao_nome:
       primeiro(eventoRaw.estacoes_reprodutivas as { nome: string } | { nome: string }[] | null)?.nome ?? "—",

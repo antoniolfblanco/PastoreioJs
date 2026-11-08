@@ -242,7 +242,10 @@ export function ListaEventos({ localId, estacoes, eventos, femeasPorEvento, pode
                           {ev.nome}
                         </Link>
                         <p className="text-sm text-muted-foreground">
-                          {rotulosMetodo[ev.metodo]} — início em {formatarData(ev.data_inicio)}
+                          {rotulosMetodo[ev.metodo]} —{" "}
+                          {ev.data_fim
+                            ? `de ${formatarData(ev.data_inicio)} a ${formatarData(ev.data_fim)}`
+                            : `início em ${formatarData(ev.data_inicio)}`}
                         </p>
                       </div>
                       {podeEditar && (

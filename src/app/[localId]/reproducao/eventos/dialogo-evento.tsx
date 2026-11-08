@@ -41,6 +41,7 @@ export function DialogoEvento({ localId, estacaoId, especieInicial, alvo, onFech
   const [especie, setEspecie] = useState<Especie>(existente?.especie ?? especieInicial);
   const [metodo, setMetodo] = useState<Metodo>(existente?.metodo ?? "inseminacao_artificial");
   const [dataInicio, setDataInicio] = useState(existente?.data_inicio ?? hojeISO);
+  const [dataFim, setDataFim] = useState(existente?.data_fim ?? "");
 
   useEffect(() => {
     if (resultado === undefined || resultado.erro) return;
@@ -117,16 +118,39 @@ export function DialogoEvento({ localId, estacaoId, especieInicial, alvo, onFech
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="dataInicioEvento">Início do evento</Label>
-              <Input
-                id="dataInicioEvento"
-                name="dataInicio"
-                type="date"
-                value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
-              />
+            <div className={metodo === "monta_natural" ? "grid grid-cols-2 gap-4" : "flex flex-col gap-2"}>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="dataInicioEvento">
+                  {metodo === "monta_natural" ? "Touro solto em" : "Início do evento"}
+                </Label>
+                <Input
+                  id="dataInicioEvento"
+                  name="dataInicio"
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                />
+              </div>
+              {metodo === "monta_natural" && (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="dataFimEvento">Retirado em (opcional)</Label>
+                  <Input
+                    id="dataFimEvento"
+                    name="dataFim"
+                    type="date"
+                    min={dataInicio}
+                    value={dataFim}
+                    onChange={(e) => setDataFim(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
+            {metodo === "monta_natural" && (
+              <p className="text-xs text-muted-foreground">
+                Na monta natural o acasalamento vale pra qualquer dia entre o touro ser solto e retirado. Sem data de
+                retirada, o evento conta como ainda em andamento.
+              </p>
+            )}
 
             {resultado?.erro && <p className="text-sm text-destructive">{resultado.erro}</p>}
             <DialogFooter>

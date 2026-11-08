@@ -28,6 +28,10 @@ export async function salvarEventoReprodutivo(
   const especie = formData.get("especie") as string;
   const dataInicio = formData.get("dataInicio") as string;
   if (!dataInicio) return { erro: "O evento precisa de uma data." };
+  // Fim só existe na monta natural (o touro fica com as fêmeas de início a
+  // fim); nos outros métodos o acasalamento tem um dia exato.
+  const dataFim = metodo === "monta_natural" ? (formData.get("dataFim") as string) || null : null;
+  if (dataFim && dataFim < dataInicio) return { erro: "O fim do evento não pode ser antes do início." };
 
   const supabase = await criarClienteServidor();
 
@@ -40,7 +44,11 @@ export async function salvarEventoReprodutivo(
       p_data_inicio: dataInicio,
     });
     if (error) return { erro: "Não foi possível salvar: " + error.message };
+    // A RPC não conhece o fim (coluna mais nova) — grava à parte.
+    const { error: erroFim } = await supabase.from("eventos_reprodutivos").update({ data_fim: dataFim }).eq("id", id);
+    if (erroFim) return { erro: "Não foi possível salvar o fim do evento: " + erroFim.message };
     revalidatePath(caminho(localId));
+    revalidatePath(`${caminho(localId)}/${id}`);
     return {};
   }
 
@@ -54,6 +62,7 @@ export async function salvarEventoReprodutivo(
     metodo,
     especie,
     data_inicio: dataInicio,
+    data_fim: dataFim,
   });
 
   if (error) return { erro: "Não foi possível criar: " + error.message };
