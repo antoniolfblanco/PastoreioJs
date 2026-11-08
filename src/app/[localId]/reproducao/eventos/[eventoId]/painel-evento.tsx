@@ -156,6 +156,32 @@ export function PainelEvento({
     }
   }
 
+  // Monta natural em grupo: a linha confirma com o lote RM em vez de um touro.
+  // Sem data digitada, usa hoje — ou o início do lote, se hoje estiver fora
+  // do período em que os touros ficaram soltos.
+  async function confirmarLinhaLoteRm(participanteId: string, rmLoteId: string) {
+    const lote = lotesRm.find((l) => l.id === rmLoteId);
+    const hoje = hojeISO;
+    const foraDoPeriodo =
+      !!lote?.data_inicio && (hoje < lote.data_inicio || (!!lote.data_fim && hoje > lote.data_fim));
+    const data = dataAcasalamentoPorLinha[participanteId] || (foraDoPeriodo ? lote!.data_inicio! : hoje);
+    setLinhaEmAndamento(participanteId);
+    try {
+      const resultado = await confirmarAcasalamentos(localId, evento.id, {
+        coberturaIds: [participanteId],
+        touroId: null,
+        rmLoteId,
+        data,
+        responsavel: null,
+      });
+      if (resultado.error) alert(resultado.error);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Não foi possível confirmar.");
+    } finally {
+      setLinhaEmAndamento(null);
+    }
+  }
+
   async function confirmarLinhaEmbriao(participanteId: string, loteEmbriaoId: string) {
     setLinhaEmAndamento(participanteId);
     try {
@@ -379,6 +405,24 @@ export function PainelEvento({
                             value=""
                             onValueChange={(touroId) => touroId && confirmarLinha(p.id, touroId)}
                           />
+                          {evento.metodo === "monta_natural" && lotesRm.length > 0 && (
+                            <Select
+                              value=""
+                              onValueChange={(loteId) => loteId && confirmarLinhaLoteRm(p.id, loteId)}
+                              items={lotesRm.map((l) => ({ value: l.id, label: l.nome }))}
+                            >
+                              <SelectTrigger className="h-8 w-36 text-sm">
+                                <SelectValue placeholder="ou Lote RM..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {lotesRm.map((l) => (
+                                  <SelectItem key={l.id} value={l.id}>
+                                    {l.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                           <Input
                             type="date"
                             className="h-8 w-32"

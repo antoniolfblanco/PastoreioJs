@@ -21,10 +21,14 @@ export type ItemNascimento = {
   observacoes: string | null;
   valor: number | null;
   // Só individual:
-  // Acasalamento de onde veio (cobertura confirmada). Preenchido, a
-  // genealogia sai dele — mãe, pai/lote RM e receptora — e os campos
-  // maeId/paiId/receptoraId abaixo são ignorados.
+  // Acasalamento de onde veio (cobertura confirmada). Preenchido, mãe e
+  // receptora saem dele e maeId/receptoraId abaixo são ignorados. O pai
+  // também sai dele, a não ser que paiDoAcasalamento seja false (o usuário
+  // trocou o pai — outro touro ou um lote RM — mantendo o vínculo).
   coberturaId?: string | null;
+  paiDoAcasalamento?: boolean;
+  // Pai como lote RM (monta natural em grupo, touro exato desconhecido).
+  paiRmLoteId?: string | null;
   nome?: string | null;
   brinco?: string | null;
   tatuagem?: string | null;
@@ -111,8 +115,14 @@ export async function registrarNascimentos(localId: string, itens: ItemNasciment
       tatuagem: individual ? item.tatuagem?.trim() || null : null,
       peso_nascimento: individual ? (item.pesoNascimento ?? null) : null,
       mae_id: cobertura ? cobertura.femea_id : individual ? item.maeId || null : null,
-      pai_id: cobertura ? cobertura.touro_id : individual ? item.paiId || null : null,
-      pai_rm_lote_id: cobertura ? cobertura.rm_lote_id : null,
+      pai_id:
+        cobertura && item.paiDoAcasalamento !== false ? cobertura.touro_id : individual ? item.paiId || null : null,
+      pai_rm_lote_id:
+        cobertura && item.paiDoAcasalamento !== false
+          ? cobertura.rm_lote_id
+          : individual
+            ? item.paiRmLoteId || null
+            : null,
       receptora_id: cobertura ? cobertura.receptora_id : individual ? item.receptoraId || null : null,
       cobertura_id: cobertura ? item.coberturaId : null,
       castrado: individual && categoria.sexo === "macho" && !!item.castrado,

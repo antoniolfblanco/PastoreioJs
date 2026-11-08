@@ -28,6 +28,7 @@ import type {
   Especie,
   Nascido,
   OpcaoArea,
+  OpcaoLoteRm,
 } from "./page";
 
 const especies: { value: Especie; rotulo: string }[] = [
@@ -146,6 +147,7 @@ export function NovoNascimento({
   nascidos,
   ativos,
   acasalamentos,
+  lotesRm,
   ciclo,
 }: {
   localId: string;
@@ -156,6 +158,7 @@ export function NovoNascimento({
   nascidos: Nascido[];
   ativos: AtivoResumo[];
   acasalamentos: AcasalamentoDisponivel[];
+  lotesRm: OpcaoLoteRm[];
   ciclo: CicloAtivo;
 }) {
   const racaPadrao = racas.find((r) => r.padrao)?.id ?? "";
@@ -183,6 +186,10 @@ export function NovoNascimento({
   const [peso, setPeso] = useState("");
   const [mae, setMae] = useState<Parente>(null);
   const [pai, setPai] = useState<Parente>(null);
+  // De onde vem o pai: do acasalamento escolhido (só no "com acasalamento"),
+  // um touro escolhido à mão (pai acima) ou um lote RM.
+  const [paiTipo, setPaiTipo] = useState<"acasalamento" | "touro" | "lote">("acasalamento");
+  const [paiLoteId, setPaiLoteId] = useState("");
   const [embriao, setEmbriao] = useState(false);
   const [receptora, setReceptora] = useState<Parente>(null);
   const [castrado, setCastrado] = useState(false);
@@ -288,6 +295,12 @@ export function NovoNascimento({
   }, [acasalamentosDaMae, data, especie]);
 
   const acasalamentoEfetivo = escolhaAcasalamento || sugerido?.id || SO_MAE;
+
+  // Escolher outro acasalamento volta o pai a ser o dele.
+  function escolherAcasalamento(id: string) {
+    setEscolhaAcasalamento(id);
+    setPaiTipo("acasalamento");
+  }
   const coberturaEscolhida =
     acasalamentoEfetivo === SO_MAE ? null : (acasalamentosDaMae.find((c) => c.id === acasalamentoEfetivo) ?? null);
 
@@ -299,6 +312,8 @@ export function NovoNascimento({
     setReceptora(null);
     setMaeArea(null);
     setEscolhaAcasalamento("");
+    setPaiTipo("acasalamento");
+    setPaiLoteId("");
   }
 
   function trocarArea(nova: string) {
@@ -338,10 +353,30 @@ export function NovoNascimento({
     const comAcasalamento = tipo === "individual" && vinculo === "acasalamento";
     if (comAcasalamento && !maeArea) return setErroForm("Selecione a mãe.");
     if (!comAcasalamento && embriao && !receptora) return setErroForm("Selecione a receptora do embrião.");
+    // Pai efetivo: no "com acasalamento", o do acasalamento se não foi
+    // trocado; "touro"/"lote" valem nos dois modos.
+    const paiDoAcasalamento = comAcasalamento && !!coberturaEscolhida && paiTipo === "acasalamento";
+    // Com acasalamento mas "somente a mãe": nenhum pai, nem o que sobrou escolhido antes.
+    const semPai = comAcasalamento && !coberturaEscolhida;
+    const usaLote = !semPai && !paiDoAcasalamento && paiTipo === "lote";
+    const usaTouro = !semPai && !paiDoAcasalamento && !usaLote && (paiTipo === "touro" || !comAcasalamento);
+    if (usaLote && !paiLoteId) return setErroForm("Selecione o lote RM do pai.");
+    if (comAcasalamento && coberturaEscolhida && paiTipo === "touro" && !pai)
+      return setErroForm("Selecione o touro pai, ou volte pro pai do acasalamento.");
+    const textoPai = paiDoAcasalamento
+      ? null
+      : usaLote
+        ? `Lote RM ${lotesRm.find((l) => l.id === paiLoteId)?.nome ?? "—"}`
+        : usaTouro
+          ? (pai?.resumo ?? null)
+          : null;
     const genealogia =
       comAcasalamento && maeArea
         ? coberturaEscolhida
-          ? genealogiaDoAcasalamento(coberturaEscolhida, maeArea.resumo)
+          ? {
+              ...genealogiaDoAcasalamento(coberturaEscolhida, maeArea.resumo),
+              ...(paiDoAcasalamento ? {} : { pai: textoPai }),
+            }
           : { mae: maeArea.resumo, pai: null, receptora: null }
         : null;
 
@@ -374,7 +409,9 @@ export function NovoNascimento({
         pesoNascimento: numero(peso),
         coberturaId: comAcasalamento ? (coberturaEscolhida?.id ?? null) : null,
         maeId: comAcasalamento ? (coberturaEscolhida ? null : (maeArea?.id ?? null)) : (mae?.id ?? null),
-        paiId: comAcasalamento ? null : (pai?.id ?? null),
+        paiDoAcasalamento: comAcasalamento ? paiDoAcasalamento : undefined,
+        paiId: usaTouro ? (pai?.id ?? null) : null,
+        paiRmLoteId: usaLote ? paiLoteId : null,
         receptoraId: comAcasalamento ? null : embriao ? (receptora?.id ?? null) : null,
         castrado: categoria.sexo === "macho" && castrado,
         registroProvisorio: exigeRegistro ? registroProvisorio.trim() || null : null,
@@ -393,7 +430,7 @@ export function NovoNascimento({
         sexo: categoria.sexo,
         racaDescricao: racasLocais.find((r) => r.id === racaId)?.descricao ?? "—",
         mae: genealogia ? genealogia.mae : individual ? (mae?.resumo ?? null) : null,
-        pai: genealogia ? genealogia.pai : individual ? (pai?.resumo ?? null) : null,
+        pai: genealogia ? genealogia.pai : individual ? textoPai : null,
         receptora: genealogia ? genealogia.receptora : individual && embriao ? (receptora?.resumo ?? null) : null,
       },
     ]);
@@ -444,6 +481,74 @@ export function NovoNascimento({
     toast.success(`${resultado.total} nascimento(s) registrado(s).`);
     limparTudo();
     setAberta(false);
+  }
+
+  // Campo do pai. Com acasalamento, a primeira opção é o pai dele (touro ou
+  // lote RM); "Não informado" ali é o mesmo que informar só a mãe.
+  function campoPai(comAcasalamento: boolean) {
+    const paiDoAcasalamento = coberturaEscolhida
+      ? (coberturaEscolhida.touro ??
+        (coberturaEscolhida.rm_lote_nome ? `Lote RM ${coberturaEscolhida.rm_lote_nome}` : "não informado no acasalamento"))
+      : null;
+    const opcoes: { id: "acasalamento" | "touro" | "lote" | "nenhum"; rotulo: string }[] = [
+      ...(comAcasalamento ? [{ id: "acasalamento" as const, rotulo: "Do acasalamento" }] : []),
+      { id: "touro", rotulo: comAcasalamento ? "Outro touro" : "Touro" },
+      { id: "lote", rotulo: "Lote RM" },
+      ...(comAcasalamento ? [{ id: "nenhum" as const, rotulo: "Não informado" }] : []),
+    ];
+    const atual = comAcasalamento ? paiTipo : paiTipo === "acasalamento" ? "touro" : paiTipo;
+    return (
+      <div className="flex flex-col gap-1.5">
+        <Label>Pai</Label>
+        <div className={cn("grid gap-1", opcoes.length > 2 ? "grid-cols-2" : "grid-cols-2")}>
+          {opcoes.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => {
+                if (o.id === "nenhum") escolherAcasalamento(SO_MAE);
+                else setPaiTipo(o.id);
+              }}
+              className={cn(buttonVariants({ variant: atual === o.id ? "secondary" : "outline", size: "sm" }))}
+            >
+              {o.rotulo}
+            </button>
+          ))}
+        </div>
+        {atual === "acasalamento" && paiDoAcasalamento && (
+          <span className="rounded-md border bg-background px-2 py-1.5 text-sm">{paiDoAcasalamento}</span>
+        )}
+        {atual === "touro" && (
+          <CampoParente
+            rotulo={comAcasalamento ? "Touro" : "Touro (vazio = não informado)"}
+            valor={pai}
+            onBuscar={() => setSeletor("pai")}
+            onLimpar={() => setPai(null)}
+          />
+        )}
+        {atual === "lote" &&
+          (lotesRm.length === 0 ? (
+            <span className="text-xs text-muted-foreground">Nenhum lote RM cadastrado.</span>
+          ) : (
+            <Select
+              value={paiLoteId}
+              onValueChange={(v) => setPaiLoteId(v ?? "")}
+              items={lotesRm.map((l) => ({ value: l.id, label: l.nome }))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o lote RM" />
+              </SelectTrigger>
+              <SelectContent>
+                {lotesRm.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ))}
+      </div>
+    );
   }
 
   if (!aberta) {
@@ -620,7 +725,7 @@ export function NovoNascimento({
                         <button
                           key={c.id}
                           type="button"
-                          onClick={() => setEscolhaAcasalamento(c.id)}
+                          onClick={() => escolherAcasalamento(c.id)}
                           className={cn(
                             "flex flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs",
                             escolhido ? "border-primary bg-secondary text-secondary-foreground" : "bg-background hover:bg-muted",
@@ -653,7 +758,7 @@ export function NovoNascimento({
                     })}
                     <button
                       type="button"
-                      onClick={() => setEscolhaAcasalamento(SO_MAE)}
+                      onClick={() => escolherAcasalamento(SO_MAE)}
                       className={cn(
                         "rounded-md border px-2 py-1.5 text-left text-sm",
                         acasalamentoEfetivo === SO_MAE
@@ -682,6 +787,7 @@ export function NovoNascimento({
                   )}
                 </div>
               )}
+              {maeArea && coberturaEscolhida && campoPai(true)}
             </>
           )}
 
@@ -770,7 +876,7 @@ export function NovoNascimento({
                     onBuscar={() => setSeletor("mae")}
                     onLimpar={() => setMae(null)}
                   />
-                  <CampoParente rotulo="Pai" valor={pai} onBuscar={() => setSeletor("pai")} onLimpar={() => setPai(null)} />
+                  {campoPai(false)}
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="embriaoNascimento"

@@ -69,6 +69,7 @@ export type AcasalamentoDisponivel = {
 };
 
 export type OpcaoArea = { id: string; nome: string };
+export type OpcaoLoteRm = { id: string; nome: string };
 export type CategoriaNascimento = { id: string; descricao: string; especie: Especie; sexo: Sexo };
 export type CicloAtivo = { nome: string; data_inicio: string; data_fim: string | null } | null;
 
@@ -275,6 +276,7 @@ export default async function NascimentosPage({
     { data: categoriasRaw, error: erroCategorias },
     { data: racas, error: erroRacas },
     { data: ciclo },
+    { data: lotesRm, error: erroLotesRm },
   ] = await Promise.all([
     buscarNascidos(supabase, localId),
     buscarAtivos(supabase, localId),
@@ -291,12 +293,13 @@ export default async function NascimentosPage({
       .order("ordem"),
     supabase.from("racas").select("id, descricao, padrao").eq("local_id", localId).eq("ativo", true).order("descricao"),
     supabase.from("ciclos").select("nome, data_inicio, data_fim").eq("local_id", localId).eq("ativo", true).maybeSingle(),
+    supabase.from("lotes_rm").select("id, nome").eq("local_id", localId).eq("ativo", true).order("nome"),
   ]);
 
-  if (erroAreas || erroCategorias || erroRacas) {
+  if (erroAreas || erroCategorias || erroRacas || erroLotesRm) {
     throw new Error(
       "Não foi possível carregar os nascimentos: " +
-        (erroAreas?.message || erroCategorias?.message || erroRacas?.message),
+        (erroAreas?.message || erroCategorias?.message || erroRacas?.message || erroLotesRm?.message),
     );
   }
 
@@ -320,6 +323,7 @@ export default async function NascimentosPage({
           nascidos={nascidos}
           ativos={ativos}
           acasalamentos={acasalamentos}
+          lotesRm={(lotesRm as OpcaoLoteRm[]) ?? []}
           ciclo={(ciclo as CicloAtivo) ?? null}
         />
       )}
