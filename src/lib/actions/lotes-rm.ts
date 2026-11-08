@@ -46,9 +46,17 @@ export async function apagarLoteRm(localId: string, id: string): Promise<Resulta
   return {};
 }
 
-export async function adicionarTouroLote(localId: string, loteRmId: string, touroId: string): Promise<ResultadoAcao> {
+// Vários touros de uma vez no mesmo lote (tela de três colunas).
+export async function adicionarTourosLote(
+  localId: string,
+  loteRmId: string,
+  touroIds: string[],
+): Promise<ResultadoAcao> {
+  if (touroIds.length === 0) return { error: "Selecione ao menos um touro." };
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.from("lotes_rm_touros").insert({ lote_rm_id: loteRmId, local_id: localId, touro_id: touroId });
+  const { error } = await supabase
+    .from("lotes_rm_touros")
+    .insert(touroIds.map((touroId) => ({ lote_rm_id: loteRmId, local_id: localId, touro_id: touroId })));
   if (error) return { error: error.message };
   revalidatePath(caminho(localId));
   return {};

@@ -1,5 +1,6 @@
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import type { AnimalSelecionavel } from "@/components/card-selecao-animais";
 import { ListaLotesRm } from "./lista-lotes-rm";
 
 export type Especie = "bovino" | "ovino" | "equino";
@@ -18,13 +19,8 @@ export type LoteRm = {
 // Candidato a touro do lote: só animais próprios ativos, machos e não
 // castrados (monta natural exige o touro fisicamente no rebanho e capaz de
 // cobrir — o banco também recusa touro externo com um trigger).
-export type CandidatoTouro = {
-  id: string;
-  nome: string | null;
-  brinco: string | null;
-  tatuagem: string | null;
-  especie: Especie;
-};
+// Mesmo formato do card de seleção compartilhado (filtros por área, categoria...).
+export type CandidatoTouro = AnimalSelecionavel;
 
 function primeiro<T>(valor: T | T[] | null): T | null {
   return Array.isArray(valor) ? (valor[0] ?? null) : valor;
@@ -51,7 +47,9 @@ export default async function LotesRmPage({
     supabase.from("lotes_rm").select("id, nome").eq("local_id", localId).eq("ativo", true).order("nome"),
     supabase
       .from("animais")
-      .select("id, nome, brinco, tatuagem, especie")
+      .select(
+        "id, nome, brinco, tatuagem, especie, sexo, grau_sangue, areas(nome), categorias!categoria_id(descricao), racas(descricao)",
+      )
       .eq("local_id", localId)
       .eq("origem_registro", "proprio")
       .eq("situacao", "ativo")
@@ -88,6 +86,20 @@ export default async function LotesRmPage({
     tourosPorLote.set(v.lote_rm_id, lista);
   }
 
+  const candidatos: CandidatoTouro[] = (candidatosRaw ?? []).map((a) => ({
+    id: a.id,
+    nome: a.nome,
+    brinco: a.brinco,
+    tatuagem: a.tatuagem,
+    especie: a.especie as Especie,
+    sexo: a.sexo,
+    grau_sangue: a.grau_sangue,
+    area_nome: primeiro(a.areas as { nome: string } | { nome: string }[] | null)?.nome ?? "—",
+    categoria_descricao:
+      primeiro(a.categorias as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
+    raca_descricao: primeiro(a.racas as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
+  }));
+
   const lotes: LoteRm[] = (lotesRaw ?? []).map((l) => ({
     id: l.id,
     nome: l.nome,
@@ -99,7 +111,7 @@ export default async function LotesRmPage({
       <ListaLotesRm
         localId={localId}
         lotes={lotes}
-        candidatos={(candidatosRaw as CandidatoTouro[]) ?? []}
+        candidatos={candidatos}
         podeEditar={podeGerenciarConteudo(local.perfil)}
       />
     </div>

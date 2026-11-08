@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apagarLoteRm, adicionarTouroLote, removerTouroLote } from "@/lib/actions/lotes-rm";
+import { apagarLoteRm, removerTouroLote } from "@/lib/actions/lotes-rm";
 import { DialogoLoteRm } from "./dialogo-lote-rm";
-import { SeletorTouroLote } from "./seletor-touro-lote";
+import { NovosTourosLote } from "./novos-touros-lote";
 import type { CandidatoTouro, LoteRm } from "./page";
 
 type Props = {
@@ -17,7 +17,9 @@ type Props = {
 
 export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) {
   const [selecionado, setSelecionado] = useState<LoteRm | "novo" | null>(null);
-  const [loteAdicionandoTouro, setLoteAdicionandoTouro] = useState<LoteRm | null>(null);
+  // Painel de três colunas de incluir touros: null = fechado; "" = aberto sem
+  // lote escolhido; id = aberto já com aquele lote no card do meio.
+  const [painelLoteId, setPainelLoteId] = useState<string | null>(null);
   const [emAndamento, setEmAndamento] = useState<string | null>(null);
 
   async function excluir(lote: LoteRm) {
@@ -27,22 +29,6 @@ export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) 
       if (resultado.error) alert(resultado.error);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível apagar.");
-    }
-  }
-
-  async function adicionarTouro(lote: LoteRm, touroId: string) {
-    setEmAndamento(`${lote.id}:${touroId}`);
-    try {
-      const resultado = await adicionarTouroLote(localId, lote.id, touroId);
-      if (resultado.error) {
-        alert(resultado.error);
-        return;
-      }
-      setLoteAdicionandoTouro(null);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Não foi possível adicionar o touro.");
-    } finally {
-      setEmAndamento(null);
     }
   }
 
@@ -69,12 +55,31 @@ export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) 
           </p>
         </div>
         {podeEditar && (
-          <Button size="sm" onClick={() => setSelecionado("novo")}>
-            <Plus className="size-4" />
-            Novo lote
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {lotes.length > 0 && painelLoteId === null && (
+              <Button size="sm" variant="outline" onClick={() => setPainelLoteId("")}>
+                <Plus className="size-4" />
+                Adicionar touros
+              </Button>
+            )}
+            <Button size="sm" onClick={() => setSelecionado("novo")}>
+              <Plus className="size-4" />
+              Novo lote
+            </Button>
+          </div>
         )}
       </div>
+
+      {podeEditar && painelLoteId !== null && (
+        <NovosTourosLote
+          key={painelLoteId}
+          localId={localId}
+          lotes={lotes}
+          candidatos={candidatos}
+          loteInicialId={painelLoteId}
+          onFechar={() => setPainelLoteId(null)}
+        />
+      )}
 
       {lotes.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-12 text-muted-foreground">
@@ -133,7 +138,7 @@ export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) 
                   {podeEditar && (
                     <button
                       type="button"
-                      onClick={() => setLoteAdicionandoTouro(lote)}
+                      onClick={() => setPainelLoteId(lote.id)}
                       className="inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1 text-sm text-muted-foreground hover:border-foreground hover:text-foreground"
                     >
                       <Plus className="size-3.5" />
@@ -148,16 +153,6 @@ export function ListaLotesRm({ localId, lotes, candidatos, podeEditar }: Props) 
       )}
 
       {podeEditar && <DialogoLoteRm key={selecionado === "novo" ? "novo" : (selecionado?.id ?? "fechado")} localId={localId} lote={selecionado} onFechar={() => setSelecionado(null)} />}
-
-      {podeEditar && (
-        <SeletorTouroLote
-          aberto={loteAdicionandoTouro !== null}
-          candidatos={candidatos}
-          jaNoLote={loteAdicionandoTouro ? new Set(loteAdicionandoTouro.touros.map((t) => t.id)) : new Set()}
-          onSelecionar={(touroId) => loteAdicionandoTouro && adicionarTouro(loteAdicionandoTouro, touroId)}
-          onFechar={() => setLoteAdicionandoTouro(null)}
-        />
-      )}
     </div>
   );
 }
