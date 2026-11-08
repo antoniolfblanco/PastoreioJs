@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import type { AnimalSelecionavel } from "@/components/card-selecao-animais";
 import { PainelEvento } from "./painel-evento";
 
 export type Especie = "bovino" | "ovino" | "equino";
@@ -130,7 +131,9 @@ export default async function EventoReprodutivoDetalhePage({
       .order("criado_em", { ascending: false }),
     supabase
       .from("animais")
-      .select("id, nome, brinco, tatuagem, sexo, especie")
+      .select(
+        "id, nome, brinco, tatuagem, sexo, especie, grau_sangue, areas(nome), categorias!categoria_id(descricao), racas(descricao)",
+      )
       .eq("local_id", localId)
       .eq("origem_registro", "proprio")
       .eq("situacao", "ativo"),
@@ -173,9 +176,35 @@ export default async function EventoReprodutivoDetalhePage({
   });
 
   const candidatos: CandidatoAnimal[] = [
-    ...(proprios.data ?? []).map((a) => ({ ...a, sexo: a.sexo as Sexo, especie: a.especie as Especie, externo: false })),
+    ...(proprios.data ?? []).map((a) => ({
+      id: a.id,
+      nome: a.nome,
+      brinco: a.brinco,
+      tatuagem: a.tatuagem,
+      sexo: a.sexo as Sexo,
+      especie: a.especie as Especie,
+      externo: false,
+    })),
     ...(externos.data ?? []).map((a) => ({ ...a, sexo: a.sexo as Sexo, especie: a.especie as Especie, externo: true })),
   ];
+
+  // Fêmeas próprias ativas da espécie do evento, com os dados que o card de
+  // seleção (filtros por área, categoria, raça...) precisa.
+  const femeasSelecionaveis: AnimalSelecionavel[] = (proprios.data ?? [])
+    .filter((a) => a.sexo === "femea" && a.especie === evento.especie)
+    .map((a) => ({
+      id: a.id,
+      nome: a.nome,
+      brinco: a.brinco,
+      tatuagem: a.tatuagem,
+      especie: a.especie as Especie,
+      sexo: a.sexo,
+      grau_sangue: a.grau_sangue,
+      area_nome: primeiro(a.areas as { nome: string } | { nome: string }[] | null)?.nome ?? "—",
+      categoria_descricao:
+        primeiro(a.categorias as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
+      raca_descricao: primeiro(a.racas as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
+    }));
 
   const lotesEmbriao: LoteEmbriaoOpcao[] = (embrioesRaw ?? []).map((l) => ({
     id: l.id,
@@ -195,6 +224,7 @@ export default async function EventoReprodutivoDetalhePage({
         evento={evento}
         participantes={participantes}
         candidatos={candidatos}
+        femeasSelecionaveis={femeasSelecionaveis}
         lotesRm={(lotesRmRaw as LoteRmOpcao[]) ?? []}
         lotesEmbriao={lotesEmbriao}
         podeEditar={podeGerenciarConteudo(local.perfil)}

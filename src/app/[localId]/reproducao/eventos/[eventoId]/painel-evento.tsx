@@ -18,7 +18,6 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  adicionarReceptorasEvento,
   confirmarAcasalamentoEmbriao,
   confirmarAcasalamentos,
   desfazerAcasalamento,
@@ -27,7 +26,8 @@ import {
 } from "@/lib/actions/coberturas";
 import { SeletorAnimalEvento } from "./seletor-animal-evento";
 import { DialogoAdicionarDosesSemen } from "./dialogo-adicionar-doses-semen";
-import { DialogoAdicionarParticipantes } from "./dialogo-adicionar-participantes";
+import { NovasParticipantes } from "./novas-participantes";
+import type { AnimalSelecionavel } from "@/components/card-selecao-animais";
 import { DialogoConfirmarAcasalamento } from "./dialogo-confirmar-acasalamento";
 import { DialogoConfirmarAcasalamentoEmbriao } from "./dialogo-confirmar-acasalamento-embriao";
 import { DialogoDiagnostico } from "./dialogo-diagnostico";
@@ -95,12 +95,22 @@ type Props = {
   evento: Evento;
   participantes: Participante[];
   candidatos: CandidatoAnimal[];
+  femeasSelecionaveis: AnimalSelecionavel[];
   lotesRm: LoteRmOpcao[];
   lotesEmbriao: LoteEmbriaoOpcao[];
   podeEditar: boolean;
 };
 
-export function PainelEvento({ localId, evento, participantes, candidatos, lotesRm, lotesEmbriao, podeEditar }: Props) {
+export function PainelEvento({
+  localId,
+  evento,
+  participantes,
+  candidatos,
+  femeasSelecionaveis,
+  lotesRm,
+  lotesEmbriao,
+  podeEditar,
+}: Props) {
   const isTeFiv = evento.metodo === "te_fiv";
   const isIa = evento.metodo === "inseminacao_artificial";
   const resumo = useMemo(() => resumoDeParticipantes(participantes), [participantes]);
@@ -259,7 +269,18 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
         <span>Inconclusivos: {resumo.inconclusivos}</span>
       </div>
 
-      {podeEditar && (
+      {podeEditar && adicionandoAberto && (
+        <NovasParticipantes
+          localId={localId}
+          evento={evento}
+          femeas={femeasSelecionaveis}
+          jaParticipantes={jaParticipantes}
+          totalParticipantes={participantes.length}
+          onFechar={() => setAdicionandoAberto(false)}
+        />
+      )}
+
+      {podeEditar && !adicionandoAberto && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button size="sm" onClick={() => setAdicionandoAberto(true)}>
             <Plus className="size-4" />
@@ -524,17 +545,6 @@ export function PainelEvento({ localId, evento, participantes, candidatos, lotes
 
       {podeEditar && (
         <>
-          <DialogoAdicionarParticipantes
-            localId={localId}
-            eventoId={evento.id}
-            especie={evento.especie}
-            candidatos={candidatos}
-            jaParticipantes={jaParticipantes}
-            aberto={adicionandoAberto}
-            onFechar={() => setAdicionandoAberto(false)}
-            titulo={isTeFiv ? "Adicionar receptoras ao evento" : "Adicionar fêmeas ao evento"}
-            acao={isTeFiv ? adicionarReceptorasEvento : undefined}
-          />
           <DialogoConfirmarAcasalamento
             localId={localId}
             eventoId={evento.id}

@@ -59,7 +59,9 @@ export function CardSelecaoAnimais({
   marcados: Set<string>;
   onMarcadosChange: (marcados: Set<string>) => void;
   idsIndisponiveis: Set<string>;
-  rotuloIndisponivel: string;
+  // Texto do selo nos travados — função quando muda por animal (ex.: "No
+  // evento" pra quem já participa, "Na lista" pra quem acabou de entrar).
+  rotuloIndisponivel: string | ((id: string) => string);
 }) {
   const [busca, setBusca] = useState("");
   const [areasFiltro, setAreasFiltro] = useState<Set<string>>(new Set());
@@ -225,7 +227,7 @@ export function CardSelecaoAnimais({
                         {identificacaoAnimal(a)}
                         {indisponivel && (
                           <Badge variant="outline" className="ml-2">
-                            {rotuloIndisponivel}
+                            {typeof rotuloIndisponivel === "function" ? rotuloIndisponivel(a.id) : rotuloIndisponivel}
                           </Badge>
                         )}
                       </TableCell>
