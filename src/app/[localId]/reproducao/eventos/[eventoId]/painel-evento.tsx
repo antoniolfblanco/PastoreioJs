@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -28,9 +27,7 @@ import { SeletorAnimalEvento } from "./seletor-animal-evento";
 import { DialogoAdicionarDosesSemen } from "./dialogo-adicionar-doses-semen";
 import { NovasParticipantes } from "./novas-participantes";
 import type { AnimalSelecionavel } from "@/components/card-selecao-animais";
-import { DialogoConfirmarAcasalamento } from "./dialogo-confirmar-acasalamento";
-import { DialogoConfirmarAcasalamentoEmbriao } from "./dialogo-confirmar-acasalamento-embriao";
-import { DialogoDiagnostico } from "./dialogo-diagnostico";
+import { ManejoAcasalamento } from "./manejo-acasalamento";
 import type {
   CandidatoAnimal,
   CertezaDiagnostico,
@@ -116,40 +113,14 @@ export function PainelEvento({
   const resumo = useMemo(() => resumoDeParticipantes(participantes), [participantes]);
   const jaParticipantes = useMemo(() => new Set(participantes.map((p) => p.femeaId)), [participantes]);
 
-  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
-  const [adicionandoAberto, setAdicionandoAberto] = useState(false);
-  const [confirmandoIds, setConfirmandoIds] = useState<string[] | null>(null);
-  const [confirmandoEmbriaoIds, setConfirmandoEmbriaoIds] = useState<string[] | null>(null);
-  const [diagnosticando, setDiagnosticando] = useState<Participante[] | null>(null);
+  // Só um painel de três colunas aberto por vez: incluir fêmeas, ou
+  // acasalamento/diagnóstico em lote.
+  const [painelAberto, setPainelAberto] = useState<"incluir" | "acasalamento" | null>(null);
   const [removendoId, setRemovendoId] = useState<string | null>(null);
   const [linhaEmAndamento, setLinhaEmAndamento] = useState<string | null>(null);
   const [dosesRapidoAberto, setDosesRapidoAberto] = useState(false);
   const [dataAcasalamentoPorLinha, setDataAcasalamentoPorLinha] = useState<Record<string, string>>({});
   const [dataDiagnosticoPorLinha, setDataDiagnosticoPorLinha] = useState<Record<string, string>>({});
-
-  const selecionadosLista = useMemo(
-    () => participantes.filter((p) => selecionados.has(p.id)),
-    [participantes, selecionados],
-  );
-  const podeConfirmarAcasalamento =
-    selecionadosLista.length > 0 && selecionadosLista.every((p) => !p.confirmada);
-  const podeRegistrarDiagnostico =
-    selecionadosLista.length > 0 && selecionadosLista.every((p) => p.confirmada && !p.pariu);
-  const selecaoMista =
-    selecionadosLista.length > 0 && !podeConfirmarAcasalamento && !podeRegistrarDiagnostico;
-
-  function alternarSelecao(id: string) {
-    setSelecionados((atual) => {
-      const novo = new Set(atual);
-      if (novo.has(id)) novo.delete(id);
-      else novo.add(id);
-      return novo;
-    });
-  }
-
-  function alternarTodos() {
-    setSelecionados((atual) => (atual.size === participantes.length ? new Set() : new Set(participantes.map((p) => p.id))));
-  }
 
   async function remover(participanteId: string) {
     if (!confirm("Remover esta fêmea do evento?")) return;
@@ -160,11 +131,6 @@ export function PainelEvento({
         alert(resultado.error);
         return;
       }
-      setSelecionados((atual) => {
-        const novo = new Set(atual);
-        novo.delete(participanteId);
-        return novo;
-      });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Não foi possível remover.");
     } finally {
@@ -269,23 +235,42 @@ export function PainelEvento({
         <span>Inconclusivos: {resumo.inconclusivos}</span>
       </div>
 
-      {podeEditar && adicionandoAberto && (
+      {podeEditar && painelAberto === "incluir" && (
         <NovasParticipantes
           localId={localId}
           evento={evento}
           femeas={femeasSelecionaveis}
           jaParticipantes={jaParticipantes}
           totalParticipantes={participantes.length}
-          onFechar={() => setAdicionandoAberto(false)}
+          onFechar={() => setPainelAberto(null)}
         />
       )}
 
-      {podeEditar && !adicionandoAberto && (
+      {podeEditar && painelAberto === "acasalamento" && (
+        <ManejoAcasalamento
+          localId={localId}
+          evento={evento}
+          participantes={participantes}
+          candidatos={candidatos}
+          lotesRm={lotesRm}
+          lotesEmbriao={lotesEmbriao}
+          onFechar={() => setPainelAberto(null)}
+        />
+      )}
+
+      {podeEditar && painelAberto === null && (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Button size="sm" onClick={() => setAdicionandoAberto(true)}>
-            <Plus className="size-4" />
-            {isTeFiv ? "Adicionar receptoras" : "Adicionar participantes"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => setPainelAberto("incluir")}>
+              <Plus className="size-4" />
+              {isTeFiv ? "Adicionar receptoras" : "Adicionar participantes"}
+            </Button>
+            {participantes.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setPainelAberto("acasalamento")}>
+                {isTeFiv ? "Transferência e diagnóstico em lote" : "Acasalamento e diagnóstico em lote"}
+              </Button>
+            )}
+          </div>
           {isIa && (
             <Button variant="outline" size="sm" onClick={() => setDosesRapidoAberto(true)}>
               <Plus className="size-4" />
@@ -304,14 +289,6 @@ export function PainelEvento({
           <Table>
             <TableHeader>
               <TableRow>
-                {podeEditar && (
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={selecionados.size > 0 && selecionados.size === participantes.length}
-                      onCheckedChange={alternarTodos}
-                    />
-                  </TableHead>
-                )}
                 <TableHead>Fêmea</TableHead>
                 <TableHead>{isTeFiv ? "Embrião" : "Acasalamento"}</TableHead>
                 <TableHead>Data</TableHead>
@@ -325,12 +302,7 @@ export function PainelEvento({
                 const podeEditarLinha = podeEditar && linhaEmAndamento !== p.id;
                 const podeDesfazer = podeEditar && p.confirmada && !p.pariu && !p.ultimoDiagnosticoResultado;
                 return (
-                  <TableRow key={p.id} data-selecionado={selecionados.has(p.id) || undefined}>
-                    {podeEditar && (
-                      <TableCell>
-                        <Checkbox checked={selecionados.has(p.id)} onCheckedChange={() => alternarSelecao(p.id)} />
-                      </TableCell>
-                    )}
+                  <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.identificacao}</TableCell>
                     <TableCell>
                       {p.confirmada ? (
@@ -515,68 +487,8 @@ export function PainelEvento({
         </div>
       )}
 
-      {podeEditar && selecionadosLista.length > 0 && (
-        <div className="sticky bottom-4 flex flex-wrap items-center gap-3 rounded-lg border bg-background p-3 shadow-lg">
-          <span className="text-sm text-muted-foreground">{selecionadosLista.length} selecionada(s)</span>
-          {selecaoMista && (
-            <span className="text-sm text-muted-foreground">
-              Selecione só fêmeas pendentes (pra acasalamento) ou só confirmadas sem diagnóstico (pra diagnóstico).
-            </span>
-          )}
-          {podeConfirmarAcasalamento && (
-            <Button
-              size="sm"
-              onClick={() => {
-                const ids = selecionadosLista.map((p) => p.id);
-                if (isTeFiv) setConfirmandoEmbriaoIds(ids);
-                else setConfirmandoIds(ids);
-              }}
-            >
-              Confirmar acasalamento ({selecionadosLista.length})
-            </Button>
-          )}
-          {podeRegistrarDiagnostico && (
-            <Button size="sm" onClick={() => setDiagnosticando(selecionadosLista)}>
-              Registrar diagnóstico ({selecionadosLista.length})
-            </Button>
-          )}
-        </div>
-      )}
-
       {podeEditar && (
         <>
-          <DialogoConfirmarAcasalamento
-            localId={localId}
-            eventoId={evento.id}
-            especie={evento.especie}
-            metodo={evento.metodo}
-            candidatos={candidatos}
-            lotesRm={lotesRm}
-            coberturaIds={confirmandoIds}
-            onFechar={() => {
-              setConfirmandoIds(null);
-              setSelecionados(new Set());
-            }}
-          />
-          <DialogoConfirmarAcasalamentoEmbriao
-            localId={localId}
-            eventoId={evento.id}
-            lotesEmbriao={lotesEmbriao}
-            coberturaIds={confirmandoEmbriaoIds}
-            onFechar={() => {
-              setConfirmandoEmbriaoIds(null);
-              setSelecionados(new Set());
-            }}
-          />
-          <DialogoDiagnostico
-            localId={localId}
-            eventoId={evento.id}
-            participantes={diagnosticando}
-            onFechar={() => {
-              setDiagnosticando(null);
-              setSelecionados(new Set());
-            }}
-          />
           {isIa && (
             <DialogoAdicionarDosesSemen
               localId={localId}
