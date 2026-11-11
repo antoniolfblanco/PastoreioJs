@@ -86,7 +86,7 @@ function formatarReais(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function CartaoEvento({ evento }: { evento: EventoDiario }) {
+export function CartaoEvento({ evento }: { evento: EventoDiario }) {
   const info = tipos[evento.tipo] ?? tipos.outro;
   const Icone = info.icone;
   const rodape = [evento.responsavel && `por ${evento.responsavel}`, evento.valor !== null && formatarReais(evento.valor)]
@@ -122,6 +122,36 @@ function CartaoEvento({ evento }: { evento: EventoDiario }) {
   );
 }
 
+// A lista já vem ordenada da RPC; só quebra em dias preservando a ordem.
+export function DiasDoDiario({ eventos }: { eventos: EventoDiario[] }) {
+  const porDia = useMemo(() => {
+    const grupos: { data: string; eventos: EventoDiario[] }[] = [];
+    for (const e of eventos) {
+      const ultimo = grupos[grupos.length - 1];
+      if (ultimo && ultimo.data === e.data) ultimo.eventos.push(e);
+      else grupos.push({ data: e.data, eventos: [e] });
+    }
+    return grupos;
+  }, [eventos]);
+
+  return (
+    <>
+      {porDia.map((dia) => (
+        <section key={dia.data} className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold capitalize text-primary">{formatarDiaExtenso(dia.data)}</h3>
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">{descreverTempoDecorrido(dia.data)}</span>
+          </div>
+          {dia.eventos.map((e, i) => (
+            <CartaoEvento key={`${e.referencia_id ?? e.tipo}-${i}`} evento={e} />
+          ))}
+        </section>
+      ))}
+    </>
+  );
+}
+
 type Props = {
   localId: string;
   eventosIniciais: EventoDiario[];
@@ -148,36 +178,14 @@ export function DiarioFazenda({ localId, eventosIniciais, erroInicial = null }: 
     setDias(novosDias);
   }
 
-  // A lista já vem ordenada da RPC; só quebra em dias preservando a ordem.
-  const porDia = useMemo(() => {
-    const grupos: { data: string; eventos: EventoDiario[] }[] = [];
-    for (const e of eventos) {
-      const ultimo = grupos[grupos.length - 1];
-      if (ultimo && ultimo.data === e.data) ultimo.eventos.push(e);
-      else grupos.push({ data: e.data, eventos: [e] });
-    }
-    return grupos;
-  }, [eventos]);
-
   return (
     <div className="flex flex-col gap-4">
       {erro && <p className="text-sm text-destructive">{erro}</p>}
 
-      {porDia.length === 0 && !erro ? (
+      {eventos.length === 0 && !erro ? (
         <p className="py-8 text-center text-sm text-muted-foreground">Nada registrado nos últimos {dias} dias.</p>
       ) : (
-        porDia.map((dia) => (
-          <section key={dia.data} className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold capitalize text-primary">{formatarDiaExtenso(dia.data)}</h3>
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground">{descreverTempoDecorrido(dia.data)}</span>
-            </div>
-            {dia.eventos.map((e, i) => (
-              <CartaoEvento key={`${e.referencia_id ?? e.tipo}-${i}`} evento={e} />
-            ))}
-          </section>
-        ))
+        <DiasDoDiario eventos={eventos} />
       )}
 
       <div className="flex flex-col items-center gap-1">

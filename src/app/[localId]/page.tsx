@@ -106,6 +106,11 @@ export default async function InicioLocalPage({
       <Card className={alturaColuna}>
         <CardHeader>
           <CardTitle className="text-base">Diário da fazenda</CardTitle>
+          <CardAction>
+            <Link href={`/${localId}/diario`} className="text-sm text-muted-foreground hover:underline">
+              Abrir diário completo
+            </Link>
+          </CardAction>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 overflow-y-auto">
           <DiarioFazenda

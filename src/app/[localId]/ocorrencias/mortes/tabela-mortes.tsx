@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Undo2, Skull, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Undo2, Skull, ArrowUp, ArrowDown, ArrowUpDown, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,6 +16,7 @@ import {
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
 import { TabelaResumo, contar } from "@/components/tabela-resumo";
 import { desfazerUltimaMorte } from "@/lib/actions/mortes";
+import { gerarPdfMortes } from "@/lib/relatorios-pdf";
 import { DialogoMorte } from "./dialogo-morte";
 import type { Especie, GrupoMorte, OpcaoEnfermidade } from "./page";
 
@@ -52,12 +53,13 @@ function valorOrdenacao(g: GrupoMorte, coluna: ColunaId): string | number {
 
 type Props = {
   localId: string;
+  localNome: string;
   grupos: GrupoMorte[];
   enfermidades: OpcaoEnfermidade[];
   podeEditar: boolean;
 };
 
-export function TabelaMortes({ localId, grupos, enfermidades, podeEditar }: Props) {
+export function TabelaMortes({ localId, localNome, grupos, enfermidades, podeEditar }: Props) {
   const [especiesFiltro, setEspeciesFiltro] = useState<Set<string>>(new Set());
   const [causasFiltro, setCausasFiltro] = useState<Set<string>>(new Set());
   const [tratadaFiltro, setTratadaFiltro] = useState<Set<string>>(new Set());
@@ -114,6 +116,45 @@ export function TabelaMortes({ localId, grupos, enfermidades, podeEditar }: Prop
     [dados],
   );
 
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+
+  // PDF do que a tela mostra agora (mesmos filtros e ordem), como no app.
+  async function pdf() {
+    setGerandoPdf(true);
+    try {
+      const filtros = [
+        especiesFiltro.size > 0 && Array.from(especiesFiltro).map((e) => rotulosEspecie[e as Especie]).join(", "),
+        causasFiltro.size > 0 && "Causas: " + Array.from(causasFiltro).join(", "),
+        tratadaFiltro.size === 1 && (tratadaFiltro.has("sim") ? "Só tratadas" : "Só não tratadas"),
+      ].filter(Boolean);
+      await gerarPdfMortes(
+        localNome,
+        filtros.length ? filtros.join(" - ") : "Todos os registros",
+        dados.map((g) => {
+          const categorias = contar(g.animais.map((a) => a.categoria_descricao));
+          const areas = Array.from(new Set(g.animais.map((a) => a.area_nome ?? "Sem área")));
+          return {
+            data: g.data,
+            quantidade: g.animais.length,
+            categoria:
+              categorias.length === 1 ? categorias[0][0] : categorias.map(([c, n]) => `${n} ${c}`).join(", "),
+            causa: g.enfermidade_descricao ?? "Não informada",
+            area: areas.length === 1 ? areas[0] : "Várias áreas",
+            responsavel: g.responsavel,
+            tratada: g.tratada,
+            observacoes: [g.descricao, g.observacoes].filter(Boolean).join(" - ") || null,
+          };
+        }),
+        porCategoria.map(([rotulo, quantidade]) => ({ rotulo, quantidade })),
+        porCausa.map(([rotulo, quantidade]) => ({ rotulo, quantidade })),
+      );
+    } catch (e) {
+      alert("Não foi possível gerar o PDF: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setGerandoPdf(false);
+    }
+  }
+
   async function desfazer() {
     if (!confirm("Desfazer o registro de morte mais recente? Os animais voltam a ficar ativos.")) return;
     setDesfazendo(true);
@@ -160,6 +201,10 @@ export function TabelaMortes({ localId, grupos, enfermidades, podeEditar }: Prop
           ]}
         />
         <span className="text-sm text-muted-foreground">{dados.length} registro(s)</span>
+        <Button variant="outline" size="sm" className="md:ml-auto" disabled={gerandoPdf} onClick={pdf}>
+          <FileDown className="size-4" />
+          {gerandoPdf ? "Gerando..." : "Gerar PDF"}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

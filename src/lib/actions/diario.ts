@@ -54,12 +54,24 @@ export async function buscarDiario(
   const ate = new Date();
   const de = new Date();
   de.setDate(de.getDate() - dias);
+  return buscarDiarioPeriodo(localId, soData(de), soData(ate));
+}
+
+// Mesma busca, por período explícito (datas "aaaa-mm-dd") — a página do
+// Diário e o PDF.
+export async function buscarDiarioPeriodo(
+  localId: string,
+  de: string,
+  ate: string,
+): Promise<{ eventos: EventoDiario[] } | { error: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate)) return { error: "Período inválido." };
+  if (de > ate) return { error: "A data inicial é depois da final." };
 
   const supabase = await criarClienteServidor();
   const { data, error } = await supabase.rpc("diario_do_local", {
     p_local_id: localId,
-    p_de: soData(de),
-    p_ate: soData(ate),
+    p_de: de,
+    p_ate: ate,
   });
 
   if (error) return { error: "Não foi possível carregar o diário: " + error.message };

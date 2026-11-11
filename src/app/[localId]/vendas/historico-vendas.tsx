@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Calculator,
   ScaleIcon,
+  FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { apagarVenda, definirValorTotalVenda, confirmarValorTotalVenda } from "@/lib/actions/vendas";
+import { gerarPdfVenda } from "@/lib/relatorios-pdf";
 import { DialogoEditarVenda } from "./dialogo-editar-venda";
 import type { Venda } from "./page";
 
@@ -73,17 +75,31 @@ function valorOrdenacao(v: Venda, coluna: ColunaId): string | number {
 
 type Props = {
   localId: string;
+  localNome: string;
   vendas: Venda[];
   podeEditar: boolean;
 };
 
-export function HistoricoVendas({ localId, vendas, podeEditar }: Props) {
+export function HistoricoVendas({ localId, localNome, vendas, podeEditar }: Props) {
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({ coluna: "data", desc: true });
   const [aberto, setAberto] = useState(false);
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
   const [editando, setEditando] = useState<Venda | null>(null);
   const [definindoTotal, setDefinindoTotal] = useState<Venda | null>(null);
   const [confirmandoRendimento, setConfirmandoRendimento] = useState<Venda | null>(null);
+
+  const [gerandoPdf, setGerandoPdf] = useState<string | null>(null);
+
+  async function pdf(venda: Venda) {
+    setGerandoPdf(venda.id);
+    try {
+      await gerarPdfVenda(localNome, venda);
+    } catch (e) {
+      alert("Não foi possível gerar o PDF: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setGerandoPdf(null);
+    }
+  }
 
   function ordenarPor(coluna: ColunaId) {
     setOrdenacao((atual) => (atual.coluna === coluna ? { coluna, desc: !atual.desc } : { coluna, desc: false }));
@@ -172,7 +188,7 @@ export function HistoricoVendas({ localId, vendas, podeEditar }: Props) {
                     </button>
                   </TableHead>
                 ))}
-                {podeEditar && <TableHead className="w-36" />}
+                <TableHead className={podeEditar ? "w-44" : "w-12"} />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -205,9 +221,20 @@ export function HistoricoVendas({ localId, vendas, podeEditar }: Props) {
                           )}
                         </div>
                       </TableCell>
-                      {podeEditar && (
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-1">
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            title="Gerar PDF da venda"
+                            disabled={gerandoPdf === v.id}
+                            onClick={() => pdf(v)}
+                          >
+                            <FileDown className="size-4" />
+                          </Button>
+                          {podeEditar && (
+                          <>
                             <Button variant="ghost" size="icon" className="size-7" title="Editar" onClick={() => setEditando(v)}>
                               <Pencil className="size-4" />
                             </Button>
@@ -240,14 +267,15 @@ export function HistoricoVendas({ localId, vendas, podeEditar }: Props) {
                             >
                               <Trash2 className="size-4" />
                             </Button>
-                          </div>
-                        </TableCell>
-                      )}
+                          </>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                     {expandida && (
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
                         <TableCell />
-                        <TableCell colSpan={podeEditar ? 6 : 5}>
+                        <TableCell colSpan={6}>
                           <div className="flex flex-col gap-1 py-1">
                             {v.animais.map((a) => (
                               <div key={a.id} className="flex items-center justify-between gap-2 text-sm">
@@ -276,7 +304,7 @@ export function HistoricoVendas({ localId, vendas, podeEditar }: Props) {
                 <TableCell className="text-right font-medium tabular-nums">{totalAnimais}</TableCell>
                 <TableCell className="text-right font-medium tabular-nums">{formatarReais(totalValor)}</TableCell>
                 <TableCell />
-                {podeEditar && <TableCell />}
+                <TableCell />
               </TableRow>
             </TableFooter>
           </Table>

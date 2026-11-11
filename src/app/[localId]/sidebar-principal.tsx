@@ -19,6 +19,8 @@ import {
   ChevronRight,
   ChevronDown,
   Check,
+  BookOpen,
+  FileText,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -36,6 +38,8 @@ import type { ItemNav, GrupoNav } from "./nav-principal";
 const iconesItem: Record<string, React.ComponentType<{ className?: string }>> = {
   Início: Home,
   Animais: Beef,
+  Diário: BookOpen,
+  Relatórios: FileText,
 };
 
 const iconesGrupo: Record<string, React.ComponentType<{ className?: string }>> = {

@@ -155,7 +155,7 @@ export default async function VendasPage({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <HistoricoVendas localId={localId} vendas={vendas} podeEditar={podeEditar} />
+      <HistoricoVendas localId={localId} localNome={local.nome} vendas={vendas} podeEditar={podeEditar} />
       {podeEditar && <NovaVenda localId={localId} animais={animaisAtivos} />}
     </div>
   );

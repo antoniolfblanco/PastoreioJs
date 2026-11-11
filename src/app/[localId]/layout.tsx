@@ -16,6 +16,8 @@ import { SidebarPrincipal } from "./sidebar-principal";
 const navegacaoPrincipal = [
   { rotulo: "Início", href: "" },
   { rotulo: "Animais", href: "/animais" },
+  { rotulo: "Diário", href: "/diario" },
+  { rotulo: "Relatórios", href: "/relatorios" },
 ];
 
 // Registros de eventos do rebanho — começa com Mortes, outras ocorrências

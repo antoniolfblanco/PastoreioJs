@@ -15,6 +15,7 @@ export type MorteAnimal = {
   brinco: string | null;
   tatuagem: string | null;
   categoria_descricao: string;
+  area_nome: string | null;
 };
 
 export type GrupoMorte = {
@@ -83,7 +84,7 @@ export default async function MortesPage({
         .select(
           `ocorrencia_grupo_id, data, especie, enfermidade_id, tratada, responsavel, descricao, observacoes,
            criado_em, animal_id, enfermidades(descricao),
-           animais(nome, brinco, tatuagem, categorias!categoria_id(descricao))`,
+           animais(nome, brinco, tatuagem, categorias!categoria_id(descricao), areas(nome))`,
         )
         .eq("local_id", localId)
         .eq("desfeita", false)
@@ -112,6 +113,7 @@ export default async function MortesPage({
       brinco: string | null;
       tatuagem: string | null;
       categorias: { descricao: string } | { descricao: string }[] | null;
+      areas: { nome: string } | { nome: string }[] | null;
     };
     const animalInfo = primeiro(linha.animais as InfoAnimal | InfoAnimal[] | null);
     const existente = grupos.get(linha.ocorrencia_grupo_id);
@@ -121,6 +123,7 @@ export default async function MortesPage({
       brinco: animalInfo?.brinco ?? null,
       tatuagem: animalInfo?.tatuagem ?? null,
       categoria_descricao: primeiro(animalInfo?.categorias ?? null)?.descricao ?? "Sem categoria",
+      area_nome: primeiro(animalInfo?.areas ?? null)?.nome ?? null,
     };
     if (existente) {
       existente.animais.push(animalEntry);
@@ -146,6 +149,7 @@ export default async function MortesPage({
     <div className="flex flex-1 flex-col gap-6">
       <TabelaMortes
         localId={localId}
+        localNome={local.nome}
         grupos={Array.from(grupos.values())}
         enfermidades={(enfermidades as OpcaoEnfermidade[]) ?? []}
         podeEditar={podeEditar}
