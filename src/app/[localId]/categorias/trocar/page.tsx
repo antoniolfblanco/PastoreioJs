@@ -1,33 +1,27 @@
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { TabelaAnimaisTroca } from "./tabela-animais-troca";
+import type { AnimalSelecionavel } from "@/components/card-selecao-animais";
+import { NovaTroca } from "./nova-troca";
 import { HistoricoTrocas } from "./historico-trocas";
 
 export type Especie = "bovino" | "ovino" | "equino";
 export type Sexo = "macho" | "femea" | "desconhecido";
 
-export type AnimalTroca = {
-  id: string;
-  nome: string | null;
-  brinco: string | null;
-  tatuagem: string | null;
-  especie: Especie;
-  sexo: Sexo;
-  grau_sangue: string;
-  categoria_id: string;
-  categoria_descricao: string;
-  area_nome: string;
-  raca_descricao: string;
-};
+// Mesmo formato do card de seleção compartilhado, mais a categoria atual
+// (pra avisar quando o destino é a mesma).
+export type AnimalTroca = AnimalSelecionavel & { categoria_id: string };
 
 export type OpcaoCategoria = { id: string; descricao: string; especie: Especie; sexo: Sexo };
 
 export type TrocaAnimal = {
+  animal_id: string;
   nome: string | null;
   brinco: string | null;
   tatuagem: string | null;
   categoria_origem_descricao: string | null;
   categoria_destino_descricao: string | null;
+  especie: Especie | null;
+  area_nome: string | null;
 };
 
 export type GrupoTroca = {
@@ -38,6 +32,8 @@ export type GrupoTroca = {
   criado_em: string;
   animais: TrocaAnimal[];
 };
+
+export type CicloAtivo = { nome: string; data_inicio: string; data_fim: string | null } | null;
 
 function primeiro<T>(valor: T | T[] | null): T | null {
   return Array.isArray(valor) ? (valor[0] ?? null) : valor;
@@ -86,6 +82,7 @@ export default async function TrocarCategoriaPage({
     animaisAtivosRaw,
     { data: categorias, error: erroCategorias },
     { data: trocasRaw, error: erroTrocas },
+    { data: ciclo },
   ] = await Promise.all([
     buscarAnimaisAtivos(supabase, localId),
     supabase
@@ -100,10 +97,11 @@ export default async function TrocarCategoriaPage({
         `troca_grupo_id, data, responsavel, descricao, criado_em, animal_id,
          origem:categorias!categoria_origem_id(descricao),
          destino:categorias!categoria_destino_id(descricao),
-         animais(nome, brinco, tatuagem)`,
+         animais(nome, brinco, tatuagem, especie, areas(nome))`,
       )
       .eq("local_id", localId)
       .order("criado_em", { ascending: false }),
+    supabase.from("ciclos").select("nome, data_inicio, data_fim").eq("local_id", localId).eq("ativo", true).maybeSingle(),
   ]);
 
   if (erroCategorias || erroTrocas) {
@@ -122,20 +120,25 @@ export default async function TrocarCategoriaPage({
 
   const grupos = new Map<string, GrupoTroca>();
   for (const linha of trocasRaw ?? []) {
-    const animalInfo = primeiro(
-      linha.animais as
-        | { nome: string | null; brinco: string | null; tatuagem: string | null }
-        | { nome: string | null; brinco: string | null; tatuagem: string | null }[]
-        | null,
-    );
+    type InfoAnimal = {
+      nome: string | null;
+      brinco: string | null;
+      tatuagem: string | null;
+      especie: Especie | null;
+      areas: { nome: string } | { nome: string }[] | null;
+    };
+    const animalInfo = primeiro(linha.animais as InfoAnimal | InfoAnimal[] | null);
     const origem = primeiro(linha.origem as { descricao: string } | { descricao: string }[] | null);
     const destino = primeiro(linha.destino as { descricao: string } | { descricao: string }[] | null);
     const animalEntry: TrocaAnimal = {
+      animal_id: linha.animal_id,
       nome: animalInfo?.nome ?? null,
       brinco: animalInfo?.brinco ?? null,
       tatuagem: animalInfo?.tatuagem ?? null,
       categoria_origem_descricao: origem?.descricao ?? null,
       categoria_destino_descricao: destino?.descricao ?? null,
+      especie: animalInfo?.especie ?? null,
+      area_nome: primeiro(animalInfo?.areas ?? null)?.nome ?? null,
     };
     const existente = grupos.get(linha.troca_grupo_id);
     if (existente) {
@@ -154,13 +157,15 @@ export default async function TrocarCategoriaPage({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <HistoricoTrocas localId={localId} grupos={Array.from(grupos.values())} podeEditar={podeEditar} />
-      <TabelaAnimaisTroca
+      <HistoricoTrocas
         localId={localId}
-        animais={animaisAtivos}
-        categorias={(categorias as OpcaoCategoria[]) ?? []}
+        grupos={Array.from(grupos.values())}
+        ciclo={(ciclo as CicloAtivo) ?? null}
         podeEditar={podeEditar}
       />
+      {podeEditar && (
+        <NovaTroca localId={localId} animais={animaisAtivos} categorias={(categorias as OpcaoCategoria[]) ?? []} />
+      )}
     </div>
   );
 }
