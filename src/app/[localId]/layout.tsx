@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, TriangleAlert } from "lucide-react";
 import { buscarLocalAtual } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { sair } from "@/lib/actions/auth";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,6 +70,7 @@ const navegacaoReproducao = [
 const navegacaoComprasVendas = [
   { rotulo: "Comprar Animais", href: "/compras" },
   { rotulo: "Vender Animais", href: "/vendas" },
+  { rotulo: "Revalorização de Animais", href: "/revalorizacao" },
 ];
 
 // Cadastros de apoio e administração do local — usados com pouca frequência
@@ -77,6 +78,7 @@ const navegacaoComprasVendas = [
 // barra principal.
 const navegacaoAjustes = [
   { rotulo: "Local e Membros", href: "/local" },
+  { rotulo: "Ciclos", href: "/ciclos" },
   { rotulo: "Raças", href: "/racas" },
   { rotulo: "Medicamentos", href: "/medicamentos" },
 ];
@@ -92,10 +94,10 @@ export default async function LocalLayout({
   const local = await buscarLocalAtual(localId);
 
   const supabase = await criarClienteServidor();
-  const { data: meusLocais } = await supabase
-    .from("usuario_locais")
-    .select("local_id, locais(id, nome)")
-    .order("criado_em");
+  const [{ data: meusLocais }, { data: cicloAtivo }] = await Promise.all([
+    supabase.from("usuario_locais").select("local_id, locais(id, nome)").order("criado_em"),
+    supabase.from("ciclos").select("id").eq("local_id", localId).eq("ativo", true).maybeSingle(),
+  ]);
 
   const outrosLocais = (meusLocais ?? [])
     .map((l) => (Array.isArray(l.locais) ? l.locais[0] : l.locais))
@@ -163,7 +165,23 @@ export default async function LocalLayout({
             </Button>
           </form>
         </header>
-        <main className="flex min-w-0 flex-1 flex-col p-6">{children}</main>
+        <main className="flex min-w-0 flex-1 flex-col p-6">
+          {/* Sem ciclo ativo, o estoque inicial não é registrado e os resumos
+              por ciclo ficam sem referência — aviso em toda tela até criar. */}
+          {!cicloAtivo && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+              <span className="flex items-center gap-2">
+                <TriangleAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                Este local não tem ciclo ativo. Os animais cadastrados não entram no estoque inicial e os resumos por
+                ciclo ficam vazios.
+              </span>
+              <Link href={`/${localId}/ciclos`} className={buttonVariants({ size: "sm" })}>
+                Criar ciclo
+              </Link>
+            </div>
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );

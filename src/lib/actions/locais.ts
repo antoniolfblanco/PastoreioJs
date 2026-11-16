@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { abrirCiclo } from "@/lib/ciclos";
 
 export type EstadoLocal = { erro?: string } | undefined;
 
@@ -26,6 +27,17 @@ export async function criarLocal(
     p_observacoes: null,
   });
   if (error || !data) return { erro: "Não foi possível criar o local: " + error?.message };
+
+  // Todo local precisa de um ciclo pra acompanhar o estoque (como no app):
+  // o ciclo inicial é criado junto. Se falhar, o local já existe — vai pra
+  // tela de Ciclos, que mostra o aviso e deixa criar ali.
+  const ciclo = await abrirCiclo(
+    supabase,
+    data.id,
+    ((formData.get("cicloNome") as string) || "").trim(),
+    (formData.get("cicloInicio") as string) || "",
+  );
+  if (ciclo.error) redirect(`/${data.id}/ciclos`);
 
   redirect(`/${data.id}`);
 }

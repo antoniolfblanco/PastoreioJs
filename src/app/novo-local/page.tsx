@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 
 export default function NovoLocalPage() {
   const [estado, acao, emAndamento] = useActionState(criarLocal, undefined);
+  const anoAtual = new Date().getFullYear();
 
   return (
     <div className="flex flex-1 items-center justify-center px-4">
@@ -24,6 +25,21 @@ export default function NovoLocalPage() {
             <div className="flex flex-col gap-2">
               <Label htmlFor="nome">Nome do local</Label>
               <Input id="nome" name="nome" required autoFocus placeholder="Ex.: Santa Fé" />
+            </div>
+            {/* Ciclo inicial obrigatório, como no app: sugere o ano atual a partir de 1º de janeiro. */}
+            <div className="flex flex-col gap-3 rounded-md border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">
+                Todo local usa ciclos pra acompanhar o estoque de animais ao longo do tempo. Confirme ou ajuste o
+                primeiro ciclo:
+              </p>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="cicloNome">Nome do ciclo</Label>
+                <Input id="cicloNome" name="cicloNome" required defaultValue={String(anoAtual)} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="cicloInicio">Início do ciclo</Label>
+                <Input id="cicloInicio" name="cicloInicio" type="date" required defaultValue={`${anoAtual}-01-01`} />
+              </div>
             </div>
             {estado?.erro && <p className="text-sm text-destructive">{estado.erro}</p>}
             <Button type="submit" disabled={emAndamento} className="mt-2">
