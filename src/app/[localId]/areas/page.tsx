@@ -10,7 +10,10 @@ export type Area = {
   observacoes: string | null;
   ordem: number;
   ativo: boolean;
+  grupo_id: string | null;
 };
+
+export type GrupoArea = { id: string; nome: string };
 
 export default async function AreasPage({
   params,
@@ -21,12 +24,15 @@ export default async function AreasPage({
   const local = await buscarLocalAtual(localId);
 
   const supabase = await criarClienteServidor();
-  const { data: areas } = await supabase
-    .from("areas")
-    .select("id, nome, tipo, tamanho, observacoes, ordem, ativo")
-    .eq("local_id", localId)
-    .order("ordem")
-    .order("nome");
+  const [{ data: areas }, { data: grupos }] = await Promise.all([
+    supabase
+      .from("areas")
+      .select("id, nome, tipo, tamanho, observacoes, ordem, ativo, grupo_id")
+      .eq("local_id", localId)
+      .order("ordem")
+      .order("nome"),
+    supabase.from("grupos_area").select("id, nome").eq("local_id", localId).order("ordem").order("nome"),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -39,6 +45,7 @@ export default async function AreasPage({
       <ListaAreas
         localId={localId}
         areas={(areas as Area[]) ?? []}
+        grupos={(grupos as GrupoArea[]) ?? []}
         podeEditar={podeGerenciarConteudo(local.perfil)}
       />
     </div>

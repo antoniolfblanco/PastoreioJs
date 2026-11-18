@@ -19,8 +19,12 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BotaoGrupos } from "@/components/dialogo-grupos";
 import { salvarArea, apagarArea } from "@/lib/actions/areas";
-import type { Area } from "./page";
+import type { Area, GrupoArea } from "./page";
+
+const SEM_GRUPO = "__sem_grupo__";
 
 const rotulosStatus: Record<string, string> = { ativa: "Ativa", inativa: "Inativa" };
 
@@ -28,19 +32,22 @@ function formatarTamanho(tamanho: number | null) {
   return tamanho !== null ? `${tamanho} ha` : "—";
 }
 
-type ColunaId = "nome" | "tipo" | "tamanho" | "status";
+type ColunaId = "nome" | "grupo" | "tipo" | "tamanho" | "status";
 
 const colunas: { id: ColunaId; rotulo: string; alinhamento?: "right" }[] = [
   { id: "nome", rotulo: "Nome" },
+  { id: "grupo", rotulo: "Grupo" },
   { id: "tipo", rotulo: "Tipo" },
   { id: "tamanho", rotulo: "Tamanho", alinhamento: "right" },
   { id: "status", rotulo: "Status" },
 ];
 
-function valorOrdenacao(a: Area, coluna: ColunaId): string | number {
+function valorOrdenacao(a: Area, coluna: ColunaId, nomeGrupo: Map<string, string>): string | number {
   switch (coluna) {
     case "nome":
       return a.nome.toLowerCase();
+    case "grupo":
+      return (a.grupo_id ? (nomeGrupo.get(a.grupo_id) ?? "") : "").toLowerCase();
     case "tipo":
       return (a.tipo ?? "").toLowerCase();
     case "tamanho":
@@ -53,11 +60,14 @@ function valorOrdenacao(a: Area, coluna: ColunaId): string | number {
 type Props = {
   localId: string;
   areas: Area[];
+  grupos: GrupoArea[];
   podeEditar: boolean;
 };
 
-export function ListaAreas({ localId, areas, podeEditar }: Props) {
+export function ListaAreas({ localId, areas, grupos, podeEditar }: Props) {
   const [busca, setBusca] = useState("");
+  const [gruposFiltro, setGruposFiltro] = useState<Set<string>>(new Set());
+  const nomeGrupo = useMemo(() => new Map(grupos.map((g) => [g.id, g.nome])), [grupos]);
   const [tiposFiltro, setTiposFiltro] = useState<Set<string>>(new Set());
   const [statusFiltro, setStatusFiltro] = useState<Set<string>>(new Set());
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({
@@ -79,19 +89,20 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
     const buscaMin = busca.trim().toLowerCase();
     const filtrados = areas.filter((a) => {
       if (tiposFiltro.size > 0 && (!a.tipo || !tiposFiltro.has(a.tipo))) return false;
+      if (gruposFiltro.size > 0 && !gruposFiltro.has(a.grupo_id ?? SEM_GRUPO)) return false;
       if (statusFiltro.size > 0 && !statusFiltro.has(a.ativo ? "ativa" : "inativa")) return false;
       if (!buscaMin) return true;
       return [a.nome, a.tipo, a.observacoes].filter(Boolean).some((texto) => texto!.toLowerCase().includes(buscaMin));
     });
 
     return [...filtrados].sort((a, b) => {
-      const va = valorOrdenacao(a, ordenacao.coluna);
-      const vb = valorOrdenacao(b, ordenacao.coluna);
+      const va = valorOrdenacao(a, ordenacao.coluna, nomeGrupo);
+      const vb = valorOrdenacao(b, ordenacao.coluna, nomeGrupo);
       const cmp =
         typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
       return ordenacao.desc ? -cmp : cmp;
     });
-  }, [areas, busca, tiposFiltro, statusFiltro, ordenacao]);
+  }, [areas, busca, tiposFiltro, gruposFiltro, statusFiltro, ordenacao, nomeGrupo]);
 
   const totalTamanho = useMemo(() => dados.reduce((soma, a) => soma + (a.tamanho ?? 0), 0), [dados]);
   const indiceTamanho = colunas.findIndex((c) => c.id === "tamanho");
@@ -116,11 +127,12 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {podeEditar && (
-        <div>
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => setSelecionadoId("novo")}>
             <Plus className="size-4" />
             Nova área
           </Button>
+          <BotaoGrupos localId={localId} tipo="area" />
         </div>
       )}
 
@@ -131,6 +143,15 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
           onChange={(e) => setBusca(e.target.value)}
           className="w-full md:max-w-64"
         />
+        {grupos.length > 0 && (
+          <FiltroMultiSelecao
+            rotulo="Todos os grupos"
+            className="w-full md:w-auto"
+            selecionados={gruposFiltro}
+            onChange={setGruposFiltro}
+            opcoes={[...grupos.map((g) => ({ value: g.id, label: g.nome })), { value: SEM_GRUPO, label: "Sem grupo" }]}
+          />
+        )}
         <FiltroMultiSelecao
           rotulo="Todos os tipos"
           className="w-full md:w-auto"
@@ -190,6 +211,7 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
                 onClick={() => podeEditar && setSelecionadoId(a.id)}
               >
                 <TableCell className="font-medium">{a.nome}</TableCell>
+                <TableCell>{a.grupo_id ? (nomeGrupo.get(a.grupo_id) ?? "—") : "—"}</TableCell>
                 <TableCell>{a.tipo ?? "—"}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatarTamanho(a.tamanho)}</TableCell>
                 <TableCell>
@@ -233,6 +255,7 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
           // "ativo" fica preso no valor da primeira montagem.
           key={selecionadoId ?? "fechado"}
           localId={localId}
+          grupos={grupos}
           area={selecionado}
           onFechar={() => setSelecionadoId(null)}
         />
@@ -243,16 +266,20 @@ export function ListaAreas({ localId, areas, podeEditar }: Props) {
 
 function DialogoArea({
   localId,
+  grupos,
   area,
   onFechar,
 }: {
   localId: string;
+  grupos: GrupoArea[];
   area: Area | "novo" | null;
   onFechar: () => void;
 }) {
   const [resultado, acao, emAndamento] = useActionState(salvarArea, undefined);
   const existente = area && area !== "novo" ? area : null;
   const [ativo, setAtivo] = useState(existente?.ativo ?? true);
+  const [grupoId, setGrupoId] = useState(existente?.grupo_id ?? SEM_GRUPO);
+  const opcoesGrupo = [{ value: SEM_GRUPO, label: "Sem grupo" }, ...grupos.map((g) => ({ value: g.id, label: g.nome }))];
 
   useEffect(() => {
     if (resultado !== undefined && !resultado.erro) onFechar();
@@ -295,6 +322,22 @@ function DialogoArea({
                   defaultValue={existente?.tamanho ?? ""}
                 />
               </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="grupoIdArea">Grupo</Label>
+              <input type="hidden" name="grupoId" value={grupoId === SEM_GRUPO ? "" : grupoId} />
+              <Select value={grupoId} onValueChange={(v) => setGrupoId((v as string) || SEM_GRUPO)} items={opcoesGrupo}>
+                <SelectTrigger id="grupoIdArea" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {opcoesGrupo.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="observacoes">Observações</Label>

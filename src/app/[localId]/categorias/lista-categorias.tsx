@@ -28,8 +28,9 @@ import {
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
 import { salvarCategoria, apagarCategoria } from "@/lib/actions/categorias";
 import { cn } from "@/lib/utils";
+import { BotaoGrupos } from "@/components/dialogo-grupos";
 import { DialogoImportarSugeridas } from "./dialogo-importar-sugeridas";
-import type { Categoria, CategoriaIvz, CategoriaSugerida, Especie } from "./page";
+import type { Categoria, CategoriaIvz, CategoriaSugerida, Especie, GrupoCategoria } from "./page";
 
 const especies: { value: Especie; rotulo: string }[] = [
   { value: "bovino", rotulo: "Bovinos" },
@@ -38,6 +39,7 @@ const especies: { value: Especie; rotulo: string }[] = [
 ];
 
 const rotulosSexo: Record<string, string> = { macho: "Macho", femea: "Fêmea", desconhecido: "—" };
+const SEM_GRUPO = "__sem_grupo__";
 const rotulosStatus: Record<string, string> = { ativa: "Ativa", inativa: "Inativa" };
 
 type ColunaId = "descricao" | "sexo" | "grupo" | "status";
@@ -67,10 +69,11 @@ type Props = {
   categorias: Categoria[];
   categoriasIvz: CategoriaIvz[];
   categoriasSugeridas: CategoriaSugerida[];
+  grupos: GrupoCategoria[];
   podeEditar: boolean;
 };
 
-export function ListaCategorias({ localId, categorias, categoriasIvz, categoriasSugeridas, podeEditar }: Props) {
+export function ListaCategorias({ localId, categorias, categoriasIvz, categoriasSugeridas, grupos, podeEditar }: Props) {
   const [especie, setEspecie] = useState<Especie>("bovino");
   const [busca, setBusca] = useState("");
   const [sexosFiltro, setSexosFiltro] = useState<Set<string>>(new Set());
@@ -168,6 +171,7 @@ export function ListaCategorias({ localId, categorias, categoriasIvz, categorias
             <Download className="size-4" />
             Importar sugeridas
           </Button>
+          <BotaoGrupos localId={localId} tipo="categoria" />
         </div>
       )}
 
@@ -282,6 +286,7 @@ export function ListaCategorias({ localId, categorias, categoriasIvz, categorias
           key={selecionadoId ?? "fechado"}
           localId={localId}
           categoriasIvz={ivzDaEspecie}
+          grupos={grupos.filter((g) => g.especie === especie)}
           categoria={selecionado}
           onFechar={() => setSelecionadoId(null)}
         />
@@ -305,11 +310,13 @@ export function ListaCategorias({ localId, categorias, categoriasIvz, categorias
 function DialogoCategoria({
   localId,
   categoriasIvz,
+  grupos,
   categoria,
   onFechar,
 }: {
   localId: string;
   categoriasIvz: CategoriaIvz[];
+  grupos: GrupoCategoria[];
   categoria: Categoria | "novo" | null;
   onFechar: () => void;
 }) {
@@ -317,6 +324,8 @@ function DialogoCategoria({
   const existente = categoria && categoria !== "novo" ? categoria : null;
   const [categoriaIvzId, setCategoriaIvzId] = useState(existente?.categoria_ivz_id ?? "");
   const [ativo, setAtivo] = useState(existente?.ativo ?? true);
+  const [grupoId, setGrupoId] = useState(existente?.grupo_id ?? SEM_GRUPO);
+  const opcoesGrupo = [{ value: SEM_GRUPO, label: "Sem grupo" }, ...grupos.map((g) => ({ value: g.id, label: g.nome }))];
 
   useEffect(() => {
     if (resultado !== undefined && !resultado.erro) onFechar();
@@ -370,8 +379,20 @@ function DialogoCategoria({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="grupo">Grupo</Label>
-                <Input id="grupo" name="grupo" defaultValue={existente?.grupo ?? ""} />
+                <Label htmlFor="grupoId">Grupo</Label>
+                <input type="hidden" name="grupoId" value={grupoId === SEM_GRUPO ? "" : grupoId} />
+                <Select value={grupoId} onValueChange={(v) => setGrupoId((v as string) || SEM_GRUPO)} items={opcoesGrupo}>
+                  <SelectTrigger id="grupoId" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opcoesGrupo.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="ordem">Ordem</Label>

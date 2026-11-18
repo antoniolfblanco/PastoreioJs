@@ -13,7 +13,8 @@ import { buscarLotacaoAreas, buscarResumoMovimentacoes, type Especie } from "@/l
 import { gerarPdfLotacao, gerarPdfMovimentacoes, rotulosEspecie } from "@/lib/relatorios-pdf";
 import { hojeIso } from "@/lib/pdf";
 import { cn } from "@/lib/utils";
-import type { AreaOpcao, CicloOpcao } from "./page";
+import { BotaoGrupos } from "@/components/dialogo-grupos";
+import type { AreaOpcao, CicloOpcao, GrupoAreaOpcao } from "./page";
 
 const ESPECIES: Especie[] = ["bovino", "ovino", "equino"];
 
@@ -57,7 +58,17 @@ function erroDe(e: unknown) {
   return "Não foi possível gerar o PDF: " + (e instanceof Error ? e.message : String(e));
 }
 
-function RelatorioMovimentacoes({ localId, localNome, ciclos }: { localId: string; localNome: string; ciclos: CicloOpcao[] }) {
+function RelatorioMovimentacoes({
+  localId,
+  localNome,
+  ciclos,
+  podeEditar,
+}: {
+  localId: string;
+  localNome: string;
+  ciclos: CicloOpcao[];
+  podeEditar: boolean;
+}) {
   const inicial = ciclos.find((c) => c.ativo) ?? ciclos[0];
   const [cicloId, setCicloId] = useState(inicial?.id ?? "");
   const ciclo = ciclos.find((c) => c.id === cicloId);
@@ -140,6 +151,7 @@ function RelatorioMovimentacoes({ localId, localNome, ciclos }: { localId: strin
           <Checkbox id="mov-vazias" checked={mostrarVazias} onCheckedChange={(v) => setMostrarVazias(v === true)} />
           <Label htmlFor="mov-vazias">Mostrar categorias vazias</Label>
         </div>
+        {podeEditar && <BotaoGrupos localId={localId} tipo="categoria" className="self-start" />}
         {erro && <p className="text-sm text-destructive">{erro}</p>}
         <Button disabled={gerando || !ciclo || especies.size === 0 || !data} onClick={gerar}>
           <FileDown className="size-4" />
@@ -150,12 +162,46 @@ function RelatorioMovimentacoes({ localId, localNome, ciclos }: { localId: strin
   );
 }
 
-function RelatorioLotacao({ localId, localNome, areas }: { localId: string; localNome: string; areas: AreaOpcao[] }) {
+function RelatorioLotacao({
+  localId,
+  localNome,
+  areas,
+  grupos,
+  podeEditar,
+}: {
+  localId: string;
+  localNome: string;
+  areas: AreaOpcao[];
+  grupos: GrupoAreaOpcao[];
+  podeEditar: boolean;
+}) {
   const [especies, setEspecies] = useState<Set<Especie>>(new Set(["bovino"]));
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set(areas.map((a) => a.id)));
   const [mostrarVazias, setMostrarVazias] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  // As áreas na ordem dos grupos; as sem grupo no fim.
+  const blocos = (() => {
+    const lista: { id: string | null; nome: string | null; areas: AreaOpcao[] }[] = grupos.map((g) => ({
+      id: g.id,
+      nome: g.nome,
+      areas: areas.filter((a) => a.grupo_id === g.id),
+    }));
+    const conhecidos = new Set(grupos.map((g) => g.id));
+    const soltas = areas.filter((a) => !a.grupo_id || !conhecidos.has(a.grupo_id));
+    if (soltas.length) lista.push({ id: null, nome: grupos.length ? "Sem grupo" : null, areas: soltas });
+    return lista.filter((b) => b.areas.length > 0);
+  })();
+
+  function marcar(ids: string[], marcado: boolean) {
+    const novo = new Set(selecionadas);
+    for (const id of ids) {
+      if (marcado) novo.add(id);
+      else novo.delete(id);
+    }
+    setSelecionadas(novo);
+  }
 
   async function gerar() {
     setGerando(true);
@@ -201,27 +247,47 @@ function RelatorioLotacao({ localId, localNome, areas }: { localId: string; loca
           {areas.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhuma área cadastrada ainda.</p>
           ) : (
-            <div className="flex max-h-56 flex-col gap-1.5 overflow-y-auto rounded-md border p-2">
-              {areas.map((a) => (
-                <div key={a.id} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`lot-area-${a.id}`}
-                    checked={selecionadas.has(a.id)}
-                    onCheckedChange={(v) => {
-                      const novo = new Set(selecionadas);
-                      if (v === true) novo.add(a.id);
-                      else novo.delete(a.id);
-                      setSelecionadas(novo);
-                    }}
-                  />
-                  <Label htmlFor={`lot-area-${a.id}`} className="font-normal">
-                    {a.nome}
-                  </Label>
-                </div>
-              ))}
+            <div className="flex max-h-72 flex-col gap-1.5 overflow-y-auto rounded-md border p-2">
+              {blocos.map((b) => {
+                const ids = b.areas.map((a) => a.id);
+                const marcadas = ids.filter((id) => selecionadas.has(id)).length;
+                return (
+                  <div key={b.id ?? "sem-grupo"} className="flex flex-col gap-1.5">
+                    {b.nome && (
+                      <div className="flex items-center gap-2 border-b pb-1 pt-1 first:pt-0">
+                        <Checkbox
+                          id={`lot-grupo-${b.id ?? "sem"}`}
+                          checked={marcadas === ids.length}
+                          indeterminate={marcadas > 0 && marcadas < ids.length}
+                          onCheckedChange={(v) => marcar(ids, v === true)}
+                        />
+                        <Label htmlFor={`lot-grupo-${b.id ?? "sem"}`} className="font-medium">
+                          {b.nome}
+                          <span className="font-normal text-muted-foreground">
+                            ({marcadas}/{ids.length})
+                          </span>
+                        </Label>
+                      </div>
+                    )}
+                    {b.areas.map((a) => (
+                      <div key={a.id} className={cn("flex items-center gap-2", b.nome && "pl-5")}>
+                        <Checkbox
+                          id={`lot-area-${a.id}`}
+                          checked={selecionadas.has(a.id)}
+                          onCheckedChange={(v) => marcar([a.id], v === true)}
+                        />
+                        <Label htmlFor={`lot-area-${a.id}`} className="font-normal">
+                          {a.nome}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
+        {podeEditar && <BotaoGrupos localId={localId} tipo="area" className="self-start" />}
         {erro && <p className="text-sm text-destructive">{erro}</p>}
         <Button disabled={gerando || especies.size === 0 || selecionadas.size === 0} onClick={gerar}>
           <FileDown className="size-4" />
@@ -263,11 +329,15 @@ export function PainelRelatorios({
   localNome,
   ciclos,
   areas,
+  gruposArea,
+  podeEditar,
 }: {
   localId: string;
   localNome: string;
   ciclos: CicloOpcao[];
   areas: AreaOpcao[];
+  gruposArea: GrupoAreaOpcao[];
+  podeEditar: boolean;
 }) {
   const base = `/${localId}`;
   return (
@@ -277,8 +347,14 @@ export function PainelRelatorios({
         <p className="text-sm text-muted-foreground">Relatórios em PDF do rebanho.</p>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <RelatorioMovimentacoes localId={localId} localNome={localNome} ciclos={ciclos} />
-        <RelatorioLotacao localId={localId} localNome={localNome} areas={areas} />
+        <RelatorioMovimentacoes localId={localId} localNome={localNome} ciclos={ciclos} podeEditar={podeEditar} />
+        <RelatorioLotacao
+          localId={localId}
+          localNome={localNome}
+          areas={areas}
+          grupos={gruposArea}
+          podeEditar={podeEditar}
+        />
         <div className="flex flex-col gap-3">
           <Atalho
             href={`${base}/diario`}

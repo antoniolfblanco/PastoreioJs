@@ -13,7 +13,8 @@ export async function salvarCategoria(
   const id = formData.get("id") as string | null;
   const categoriaIvzId = formData.get("categoriaIvzId") as string;
   const descricao = (formData.get("descricao") as string)?.trim();
-  const grupo = (formData.get("grupo") as string)?.trim();
+  // Grupo escolhido da lista cadastrada; sem o campo no form, não mexe.
+  const grupoId = formData.has("grupoId") ? (formData.get("grupoId") as string) || null : undefined;
   const observacao = (formData.get("observacao") as string)?.trim();
   const ordem = formData.get("ordem") as string;
   const ativo = formData.get("ativo") === "on";
@@ -39,7 +40,7 @@ export async function salvarCategoria(
     especie: ivz.especie,
     sexo: ivz.sexo,
     descricao,
-    grupo: grupo || null,
+    ...(grupoId !== undefined ? { grupo_id: grupoId } : {}),
     observacao: observacao || null,
     ordem: ordem ? Number(ordem) : 0,
     ativo,

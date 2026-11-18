@@ -18,6 +18,7 @@ export async function salvarArea(
   const tamanho = formData.get("tamanho") as string;
   const observacoes = (formData.get("observacoes") as string)?.trim();
   const ativo = formData.get("ativo") === "on";
+  const grupoId = formData.has("grupoId") ? (formData.get("grupoId") as string) || null : undefined;
 
   const dados = {
     local_id: localId,
@@ -26,6 +27,7 @@ export async function salvarArea(
     tamanho: tamanho ? Number(tamanho) : null,
     observacoes: observacoes || null,
     ativo,
+    ...(grupoId !== undefined ? { grupo_id: grupoId } : {}),
   };
 
   const supabase = await criarClienteServidor();

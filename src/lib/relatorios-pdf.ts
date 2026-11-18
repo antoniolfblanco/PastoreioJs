@@ -8,15 +8,27 @@ import { rotulosTipoDiario } from "@/lib/diario-tipos";
 
 export const rotulosEspecie = { bovino: "Bovino", ovino: "Ovino", equino: "Equino" } as const;
 
-// Agrupa mantendo a ordem de chegada; itens sem grupo ficam soltos (sem
-// linha de bloco) — igual ao app.
-function porGrupo<T extends { grupo: string | null }>(itens: T[]) {
+// Agrupa mantendo a ordem de chegada (os dados já vêm na ordem dos grupos
+// cadastrados). Se ninguém tem grupo, fica tudo solto, sem linha de bloco,
+// como no app; se alguns têm, os sem grupo viram o bloco "Sem grupo".
+function porGrupo<T extends { grupo: string | null }>(itens: T[]): [string | null, T[]][] {
   const grupos = new Map<string | null, T[]>();
   for (const i of itens) {
     if (!grupos.has(i.grupo)) grupos.set(i.grupo, []);
     grupos.get(i.grupo)!.push(i);
   }
-  return Array.from(grupos.entries());
+  const algumGrupo = Array.from(grupos.keys()).some((g) => g !== null);
+  return Array.from(grupos.entries()).map(([g, lista]) => [g ?? (algumGrupo ? "Sem grupo" : null), lista]);
+}
+
+// Linhas de uma tabela de categorias com o bloco de cada grupo e o subtotal.
+function linhasPorCategoria(itens: { categoria: string; grupo: string | null; total: number }[]) {
+  const linhas: LinhaPdf[] = [];
+  for (const [grupo, lista] of porGrupo(itens)) {
+    if (grupo) linhas.push({ celulas: [grupo, String(lista.reduce((s, i) => s + i.total, 0))], estilo: "grupo" });
+    for (const i of lista) linhas.push([grupo ? `   ${i.categoria}` : i.categoria, String(i.total)]);
+  }
+  return linhas;
 }
 
 function comSinal(v: number) {
@@ -128,24 +140,63 @@ export async function gerarPdfLotacao(localNome: string, especies: (keyof typeof
 
   if (areas.length === 0) pdf.texto("Nenhuma área com animais na seleção.");
 
-  for (const area of areas) {
-    const linhas: LinhaPdf[] = [];
-    for (const [grupo, itens] of porGrupo(area.itens)) {
-      if (grupo) linhas.push({ celulas: [grupo, String(itens.reduce((s, i) => s + i.total, 0))], estilo: "grupo" });
-      for (const i of itens) linhas.push([grupo ? `   ${i.categoria}` : i.categoria, String(i.total)]);
-    }
-    pdf.garantirEspaco(60);
+  const blocos = porGrupo(areas);
+  const comGrupos = blocos.some(([g]) => g !== null);
+
+  // Com grupos de áreas: primeiro um quadro com o total de cada grupo.
+  if (comGrupos) {
+    pdf.secao("Resumo por grupo de áreas", 10);
     pdf.tabela({
-      // A faixa da área no topo, como no app (escura, nome e total).
-      linhas: [
-        { celulas: [area.areaNome, String(area.total)], estilo: "total" },
-        ...(linhas.length ? linhas : [["Sem animais.", ""]]),
-      ],
-      larguras: [4, 1],
-      direita: [1],
+      cabecalho: ["Grupo", "Áreas", "Animais"],
+      linhas: blocos.map(([g, lista]) => [g ?? "Sem grupo", String(lista.length), String(lista.reduce((s, a) => s + a.total, 0))]),
+      rodape: [["Total", String(areas.length), String(areas.reduce((s, a) => s + a.total, 0))]],
+      larguras: [3, 1, 1],
+      direita: [1, 2],
       tamanhoFonte: 9,
     });
-    pdf.espaco(12);
+    pdf.espaco(14);
+  }
+
+  for (const [grupo, lista] of blocos) {
+    if (grupo) {
+      // Cabeçalho do grupo: o consolidado das áreas dele, por categoria.
+      const somadas = new Map<string, { categoria: string; grupo: string | null; total: number }>();
+      for (const a of lista)
+        for (const i of a.itens) {
+          const atual = somadas.get(i.categoria) ?? { ...i, total: 0 };
+          atual.total += i.total;
+          somadas.set(i.categoria, atual);
+        }
+      const total = lista.reduce((s, a) => s + a.total, 0);
+      pdf.garantirEspaco(80);
+      pdf.secao(`${grupo} - ${total} animais em ${lista.length} área(s)`, 11);
+      pdf.tabela({
+        linhas: [
+          { celulas: [`Total do grupo ${grupo}`, String(total)], estilo: "total" },
+          ...(somadas.size ? linhasPorCategoria(Array.from(somadas.values())) : [["Sem animais.", ""]]),
+        ],
+        larguras: [4, 1],
+        direita: [1],
+        tamanhoFonte: 9,
+      });
+      pdf.espaco(10);
+    }
+
+    for (const area of lista) {
+      const linhas = linhasPorCategoria(area.itens);
+      pdf.garantirEspaco(60);
+      pdf.tabela({
+        // A faixa da área no topo, como no app (escura, nome e total).
+        linhas: [
+          { celulas: [area.areaNome, String(area.total)], estilo: "total" },
+          ...(linhas.length ? linhas : [["Sem animais.", ""]]),
+        ],
+        larguras: [4, 1],
+        direita: [1],
+        tamanhoFonte: 9,
+      });
+      pdf.espaco(12);
+    }
   }
 
   pdf.salvar(`Lotação por Área - ${localNome}.pdf`);

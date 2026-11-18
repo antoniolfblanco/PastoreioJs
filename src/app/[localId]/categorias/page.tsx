@@ -11,10 +11,13 @@ export type Categoria = {
   sexo: string;
   categoria_ivz_id: string;
   grupo: string | null;
+  grupo_id: string | null;
   observacao: string | null;
   ordem: number;
   ativo: boolean;
 };
+
+export type GrupoCategoria = { id: string; nome: string; especie: Especie };
 
 export type CategoriaIvz = {
   id: string;
@@ -41,10 +44,10 @@ export default async function CategoriasPage({
   const local = await buscarLocalAtual(localId);
 
   const supabase = await criarClienteServidor();
-  const [{ data: categorias }, { data: categoriasIvz }, { data: categoriasSugeridas }] = await Promise.all([
+  const [{ data: categorias }, { data: categoriasIvz }, { data: categoriasSugeridas }, { data: grupos }] = await Promise.all([
     supabase
       .from("categorias")
-      .select("id, descricao, especie, sexo, categoria_ivz_id, grupo, observacao, ordem, ativo")
+      .select("id, descricao, especie, sexo, categoria_ivz_id, grupo, grupo_id, observacao, ordem, ativo")
       .eq("local_id", localId)
       .order("ordem")
       .order("descricao"),
@@ -54,6 +57,7 @@ export default async function CategoriasPage({
       .select("id, descricao, especie, sexo, ordem, categoria_ivz_id")
       .eq("ativo", true)
       .order("ordem"),
+    supabase.from("grupos_categoria").select("id, nome, especie").eq("local_id", localId).order("ordem").order("nome"),
   ]);
 
   return (
@@ -69,6 +73,7 @@ export default async function CategoriasPage({
         categorias={(categorias as Categoria[]) ?? []}
         categoriasIvz={(categoriasIvz as CategoriaIvz[]) ?? []}
         categoriasSugeridas={(categoriasSugeridas as CategoriaSugerida[]) ?? []}
+        grupos={(grupos as GrupoCategoria[]) ?? []}
         podeEditar={podeGerenciarConteudo(local.perfil)}
       />
     </div>

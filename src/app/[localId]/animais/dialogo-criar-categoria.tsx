@@ -100,10 +100,6 @@ export function DialogoCriarCategoria({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="grupoNovaCategoria">Grupo</Label>
-                <Input id="grupoNovaCategoria" name="grupo" />
-              </div>
-              <div className="flex flex-col gap-2">
                 <Label htmlFor="ordemNovaCategoria">Ordem</Label>
                 <Input id="ordemNovaCategoria" name="ordem" type="number" defaultValue={0} />
               </div>
