@@ -14,6 +14,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
+import { opcoesArea, recortarPorArea } from "@/lib/filtro-area";
 import { TabelaResumo, contar } from "@/components/tabela-resumo";
 import { desfazerUltimaMorte } from "@/lib/actions/mortes";
 import { gerarPdfMortes } from "@/lib/relatorios-pdf";
@@ -61,6 +62,8 @@ type Props = {
 
 export function TabelaMortes({ localId, localNome, grupos, enfermidades, podeEditar }: Props) {
   const [especiesFiltro, setEspeciesFiltro] = useState<Set<string>>(new Set());
+  const [areasFiltro, setAreasFiltro] = useState<Set<string>>(new Set());
+  const areasDisponiveis = useMemo(() => opcoesArea(grupos), [grupos]);
   const [causasFiltro, setCausasFiltro] = useState<Set<string>>(new Set());
   const [tratadaFiltro, setTratadaFiltro] = useState<Set<string>>(new Set());
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({ coluna: "data", desc: true });
@@ -82,7 +85,7 @@ export function TabelaMortes({ localId, localNome, grupos, enfermidades, podeEdi
   }
 
   const dados = useMemo(() => {
-    const filtrados = grupos.filter((g) => {
+    const filtrados = recortarPorArea(grupos, areasFiltro).filter((g) => {
       if (especiesFiltro.size > 0 && !especiesFiltro.has(g.especie)) return false;
       if (causasFiltro.size > 0 && (!g.enfermidade_descricao || !causasFiltro.has(g.enfermidade_descricao)))
         return false;
@@ -97,7 +100,7 @@ export function TabelaMortes({ localId, localNome, grupos, enfermidades, podeEdi
         typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
       return ordenacao.desc ? -cmp : cmp;
     });
-  }, [grupos, especiesFiltro, causasFiltro, tratadaFiltro, ordenacao]);
+  }, [grupos, especiesFiltro, causasFiltro, tratadaFiltro, ordenacao, areasFiltro]);
 
   const totalAnimais = useMemo(() => dados.reduce((soma, g) => soma + g.animais.length, 0), [dados]);
   const indiceQuantidade = colunas.findIndex((c) => c.id === "quantidade");
@@ -124,6 +127,7 @@ export function TabelaMortes({ localId, localNome, grupos, enfermidades, podeEdi
     try {
       const filtros = [
         especiesFiltro.size > 0 && Array.from(especiesFiltro).map((e) => rotulosEspecie[e as Especie]).join(", "),
+        areasFiltro.size > 0 && "Áreas: " + Array.from(areasFiltro).join(", "),
         causasFiltro.size > 0 && "Causas: " + Array.from(causasFiltro).join(", "),
         tratadaFiltro.size === 1 && (tratadaFiltro.has("sim") ? "Só tratadas" : "Só não tratadas"),
       ].filter(Boolean);
@@ -182,6 +186,13 @@ export function TabelaMortes({ localId, localNome, grupos, enfermidades, podeEdi
           selecionados={especiesFiltro}
           onChange={setEspeciesFiltro}
           opcoes={Object.entries(rotulosEspecie).map(([value, label]) => ({ value, label }))}
+        />
+        <FiltroMultiSelecao
+          rotulo="Todas as áreas"
+          className="w-full md:w-auto"
+          selecionados={areasFiltro}
+          onChange={setAreasFiltro}
+          opcoes={areasDisponiveis}
         />
         <FiltroMultiSelecao
           rotulo="Todas as causas"

@@ -7,6 +7,7 @@ import { NovoConsumo } from "./novo-consumo";
 export type Especie = "bovino" | "ovino" | "equino";
 
 export type ConsumoAnimal = {
+  area_nome: string | null;
   animal_id: string;
   nome: string | null;
   brinco: string | null;
@@ -45,7 +46,7 @@ export default async function ConsumoPage({ params }: { params: Promise<{ localI
       .from("ocorrencias_consumo")
       .select(
         `ocorrencia_grupo_id, data, especie, peso_vivo, peso_carne, destino, responsavel, descricao,
-         observacoes, criado_em, animal_id, animais(nome, brinco, tatuagem, categorias!categoria_id(descricao))`,
+         observacoes, criado_em, animal_id, animais(nome, brinco, tatuagem, categorias!categoria_id(descricao), areas(nome))`,
       )
       .eq("local_id", localId)
       .eq("desfeita", false)
@@ -61,6 +62,7 @@ export default async function ConsumoPage({ params }: { params: Promise<{ localI
     brinco: string | null;
     tatuagem: string | null;
     categorias: { descricao: string } | { descricao: string }[] | null;
+    areas: { nome: string } | { nome: string }[] | null;
   };
   const grupos = new Map<string, GrupoConsumo>();
   for (const linha of consumosRaw ?? []) {
@@ -71,6 +73,7 @@ export default async function ConsumoPage({ params }: { params: Promise<{ localI
       brinco: info?.brinco ?? null,
       tatuagem: info?.tatuagem ?? null,
       categoria_descricao: primeiro(info?.categorias ?? null)?.descricao ?? "Sem categoria",
+      area_nome: primeiro(info?.areas ?? null)?.nome ?? null,
     };
     const existente = grupos.get(linha.ocorrencia_grupo_id);
     if (existente) existente.animais.push(animal);

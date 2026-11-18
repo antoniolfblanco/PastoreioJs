@@ -13,6 +13,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
+import { opcoesArea, recortarPorArea } from "@/lib/filtro-area";
 import { TabelaResumo, contar } from "@/components/tabela-resumo";
 import { CartoesResumo, usePeriodo, type CicloPeriodo } from "@/components/filtro-periodo";
 import { identificacaoAnimal } from "@/components/card-selecao-animais";
@@ -68,6 +69,8 @@ type Props = {
 export function TabelaConsumo({ localId, grupos, ciclo, podeEditar }: Props) {
   const { dentro, seletor } = usePeriodo(ciclo);
   const [especiesFiltro, setEspeciesFiltro] = useState<Set<string>>(new Set());
+  const [areasFiltro, setAreasFiltro] = useState<Set<string>>(new Set());
+  const areasDisponiveis = useMemo(() => opcoesArea(grupos), [grupos]);
   const [destinosFiltro, setDestinosFiltro] = useState<Set<string>>(new Set());
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({ coluna: "data", desc: true });
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
@@ -88,7 +91,7 @@ export function TabelaConsumo({ localId, grupos, ciclo, podeEditar }: Props) {
   }
 
   const dados = useMemo(() => {
-    const filtrados = grupos.filter((g) => {
+    const filtrados = recortarPorArea(grupos, areasFiltro).filter((g) => {
       if (!dentro(g.data)) return false;
       if (especiesFiltro.size > 0 && !especiesFiltro.has(g.especie)) return false;
       if (destinosFiltro.size > 0 && (!g.destino || !destinosFiltro.has(g.destino))) return false;
@@ -101,7 +104,7 @@ export function TabelaConsumo({ localId, grupos, ciclo, podeEditar }: Props) {
         typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
       return ordenacao.desc ? -cmp : cmp;
     });
-  }, [grupos, dentro, especiesFiltro, destinosFiltro, ordenacao]);
+  }, [grupos, dentro, especiesFiltro, destinosFiltro, ordenacao, areasFiltro]);
 
   const selecionado = selecionadoId === null ? null : (grupos.find((g) => g.ocorrencia_grupo_id === selecionadoId) ?? null);
 
@@ -145,6 +148,13 @@ export function TabelaConsumo({ localId, grupos, ciclo, podeEditar }: Props) {
           selecionados={especiesFiltro}
           onChange={setEspeciesFiltro}
           opcoes={Object.entries(rotulosEspecie).map(([value, label]) => ({ value, label }))}
+        />
+        <FiltroMultiSelecao
+          rotulo="Todas as áreas"
+          className="w-full md:w-auto"
+          selecionados={areasFiltro}
+          onChange={setAreasFiltro}
+          opcoes={areasDisponiveis}
         />
         <FiltroMultiSelecao
           rotulo="Todos os destinos"

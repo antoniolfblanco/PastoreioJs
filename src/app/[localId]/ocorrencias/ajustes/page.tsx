@@ -10,6 +10,7 @@ export type Sexo = "macho" | "femea" | "desconhecido";
 export type Tipo = "entrada" | "saida";
 
 export type AjusteAnimal = {
+  area_nome: string | null;
   nome: string | null;
   brinco: string | null;
   tatuagem: string | null;
@@ -57,7 +58,7 @@ export default async function AjustesPage({ params }: { params: Promise<{ localI
       .from("ocorrencias_ajuste")
       .select(
         `ocorrencia_grupo_id, tipo, data, responsavel, descricao, observacoes, criado_em, animal_id,
-         animais(nome, brinco, tatuagem, especie, categorias!categoria_id(descricao))`,
+         animais(nome, brinco, tatuagem, especie, categorias!categoria_id(descricao), areas(nome))`,
       )
       .eq("local_id", localId)
       .eq("desfeita", false)
@@ -85,6 +86,7 @@ export default async function AjustesPage({ params }: { params: Promise<{ localI
     tatuagem: string | null;
     especie: Especie;
     categorias: { descricao: string } | { descricao: string }[] | null;
+    areas: { nome: string } | { nome: string }[] | null;
   };
   const grupos = new Map<string, GrupoAjuste>();
   for (const linha of ajustesRaw ?? []) {
@@ -95,6 +97,7 @@ export default async function AjustesPage({ params }: { params: Promise<{ localI
       tatuagem: info?.tatuagem ?? null,
       especie: info?.especie ?? "bovino",
       categoria_descricao: primeiro(info?.categorias ?? null)?.descricao ?? "Sem categoria",
+      area_nome: primeiro(info?.areas ?? null)?.nome ?? null,
     };
     const existente = grupos.get(linha.ocorrencia_grupo_id);
     if (existente) existente.animais.push(animal);

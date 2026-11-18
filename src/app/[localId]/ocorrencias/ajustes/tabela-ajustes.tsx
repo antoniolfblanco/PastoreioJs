@@ -14,6 +14,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
+import { opcoesArea, recortarPorArea } from "@/lib/filtro-area";
 import { TabelaResumo, contar } from "@/components/tabela-resumo";
 import { CartoesResumo, usePeriodo, type CicloPeriodo } from "@/components/filtro-periodo";
 import { identificacaoAnimal } from "@/components/card-selecao-animais";
@@ -63,6 +64,8 @@ export function TabelaAjustes({ localId, grupos, ciclo, podeEditar }: Props) {
   const { dentro, seletor } = usePeriodo(ciclo);
   const [tiposFiltro, setTiposFiltro] = useState<Set<string>>(new Set());
   const [especiesFiltro, setEspeciesFiltro] = useState<Set<string>>(new Set());
+  const [areasFiltro, setAreasFiltro] = useState<Set<string>>(new Set());
+  const areasDisponiveis = useMemo(() => opcoesArea(grupos), [grupos]);
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({ coluna: "data", desc: true });
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
 
@@ -82,7 +85,7 @@ export function TabelaAjustes({ localId, grupos, ciclo, podeEditar }: Props) {
   }
 
   const dados = useMemo(() => {
-    const filtrados = grupos.filter(
+    const filtrados = recortarPorArea(grupos, areasFiltro).filter(
       (g) =>
         dentro(g.data) &&
         (tiposFiltro.size === 0 || tiposFiltro.has(g.tipo)) &&
@@ -95,7 +98,7 @@ export function TabelaAjustes({ localId, grupos, ciclo, podeEditar }: Props) {
         typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
       return ordenacao.desc ? -cmp : cmp;
     });
-  }, [grupos, dentro, tiposFiltro, especiesFiltro, ordenacao]);
+  }, [grupos, dentro, tiposFiltro, especiesFiltro, ordenacao, areasFiltro]);
 
   const resumo = useMemo(() => {
     const entradas = dados.filter((g) => g.tipo === "entrada").flatMap((g) => g.animais);
@@ -149,6 +152,13 @@ export function TabelaAjustes({ localId, grupos, ciclo, podeEditar }: Props) {
           selecionados={especiesFiltro}
           onChange={setEspeciesFiltro}
           opcoes={Object.entries(rotulosEspecie).map(([value, label]) => ({ value, label }))}
+        />
+        <FiltroMultiSelecao
+          rotulo="Todas as áreas"
+          className="w-full md:w-auto"
+          selecionados={areasFiltro}
+          onChange={setAreasFiltro}
+          opcoes={areasDisponiveis}
         />
       </div>
 
