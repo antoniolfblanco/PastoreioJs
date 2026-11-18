@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Undo2, Beef, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Undo2, Utensils, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,9 +13,12 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
+import { TabelaResumo, contar } from "@/components/tabela-resumo";
+import { CartoesResumo, usePeriodo, type CicloPeriodo } from "@/components/filtro-periodo";
+import { identificacaoAnimal } from "@/components/card-selecao-animais";
 import { desfazerUltimoConsumo } from "@/lib/actions/consumo";
 import { DialogoConsumo } from "./dialogo-consumo";
-import type { AnimalAtivo, Especie, GrupoConsumo } from "./page";
+import type { Especie, GrupoConsumo } from "./page";
 
 const rotulosEspecie: Record<Especie, string> = { bovino: "Bovino", ovino: "Ovino", equino: "Equino" };
 
@@ -24,7 +27,7 @@ function formatarData(data: string) {
 }
 
 function formatarPeso(peso: number | null) {
-  return peso !== null ? `${peso} kg` : "—";
+  return peso !== null ? `${peso.toLocaleString("pt-BR")} kg` : "—";
 }
 
 type ColunaId = "data" | "descricao" | "quantidade" | "pesoVivo" | "pesoCarne" | "destino";
@@ -32,7 +35,7 @@ type ColunaId = "data" | "descricao" | "quantidade" | "pesoVivo" | "pesoCarne" |
 const colunas: { id: ColunaId; rotulo: string; alinhamento?: "right" }[] = [
   { id: "data", rotulo: "Data" },
   { id: "descricao", rotulo: "Descrição" },
-  { id: "quantidade", rotulo: "Quantidade", alinhamento: "right" },
+  { id: "quantidade", rotulo: "Animais", alinhamento: "right" },
   { id: "pesoVivo", rotulo: "Peso vivo", alinhamento: "right" },
   { id: "pesoCarne", rotulo: "Peso carne", alinhamento: "right" },
   { id: "destino", rotulo: "Destino" },
@@ -58,15 +61,16 @@ function valorOrdenacao(g: GrupoConsumo, coluna: ColunaId): string | number {
 type Props = {
   localId: string;
   grupos: GrupoConsumo[];
-  animaisAtivos: AnimalAtivo[];
+  ciclo: CicloPeriodo;
   podeEditar: boolean;
 };
 
-export function TabelaConsumo({ localId, grupos, animaisAtivos, podeEditar }: Props) {
+export function TabelaConsumo({ localId, grupos, ciclo, podeEditar }: Props) {
+  const { dentro, seletor } = usePeriodo(ciclo);
   const [especiesFiltro, setEspeciesFiltro] = useState<Set<string>>(new Set());
   const [destinosFiltro, setDestinosFiltro] = useState<Set<string>>(new Set());
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({ coluna: "data", desc: true });
-  const [selecionadoId, setSelecionadoId] = useState<string | "novo" | null>(null);
+  const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [desfazendo, setDesfazendo] = useState(false);
 
   const grupoMaisRecenteId = useMemo(() => {
@@ -85,11 +89,11 @@ export function TabelaConsumo({ localId, grupos, animaisAtivos, podeEditar }: Pr
 
   const dados = useMemo(() => {
     const filtrados = grupos.filter((g) => {
+      if (!dentro(g.data)) return false;
       if (especiesFiltro.size > 0 && !especiesFiltro.has(g.especie)) return false;
       if (destinosFiltro.size > 0 && (!g.destino || !destinosFiltro.has(g.destino))) return false;
       return true;
     });
-
     return [...filtrados].sort((a, b) => {
       const va = valorOrdenacao(a, ordenacao.coluna);
       const vb = valorOrdenacao(b, ordenacao.coluna);
@@ -97,18 +101,21 @@ export function TabelaConsumo({ localId, grupos, animaisAtivos, podeEditar }: Pr
         typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
       return ordenacao.desc ? -cmp : cmp;
     });
-  }, [grupos, especiesFiltro, destinosFiltro, ordenacao]);
+  }, [grupos, dentro, especiesFiltro, destinosFiltro, ordenacao]);
 
-  const selecionado =
-    selecionadoId === null
-      ? null
-      : selecionadoId === "novo"
-        ? "novo"
-        : (grupos.find((g) => g.ocorrencia_grupo_id === selecionadoId) ?? null);
+  const selecionado = selecionadoId === null ? null : (grupos.find((g) => g.ocorrencia_grupo_id === selecionadoId) ?? null);
 
-  const totalAnimais = useMemo(() => dados.reduce((soma, g) => soma + g.animais.length, 0), [dados]);
-  const totalPesoVivo = useMemo(() => dados.reduce((soma, g) => soma + (g.peso_vivo ?? 0), 0), [dados]);
-  const totalPesoCarne = useMemo(() => dados.reduce((soma, g) => soma + (g.peso_carne ?? 0), 0), [dados]);
+  // Resumos no mesmo recorte da tabela, animal por animal.
+  const resumo = useMemo(
+    () => ({
+      animais: dados.reduce((s, g) => s + g.animais.length, 0),
+      pesoVivo: dados.reduce((s, g) => s + (g.peso_vivo ?? 0), 0),
+      pesoCarne: dados.reduce((s, g) => s + (g.peso_carne ?? 0), 0),
+      porCategoria: contar(dados.flatMap((g) => g.animais.map((a) => a.categoria_descricao))),
+      porDestino: contar(dados.flatMap((g) => g.animais.map(() => g.destino ?? "Não informado"))),
+    }),
+    [dados],
+  );
 
   async function desfazer() {
     if (!confirm("Desfazer o registro de consumo mais recente? Os animais voltam a ficar ativos.")) return;
@@ -130,16 +137,8 @@ export function TabelaConsumo({ localId, grupos, animaisAtivos, podeEditar }: Pr
         <p className="text-sm text-muted-foreground">Abates para consumo próprio do rebanho.</p>
       </div>
 
-      {podeEditar && (
-        <div>
-          <Button size="sm" onClick={() => setSelecionadoId("novo")}>
-            <Plus className="size-4" />
-            Registrar consumo
-          </Button>
-        </div>
-      )}
-
       <div className="flex flex-wrap items-center gap-2">
+        {seletor}
         <FiltroMultiSelecao
           rotulo="Todas as espécies"
           className="w-full md:w-auto"
@@ -154,95 +153,102 @@ export function TabelaConsumo({ localId, grupos, animaisAtivos, podeEditar }: Pr
           onChange={setDestinosFiltro}
           opcoes={destinosDisponiveis.map((d) => ({ value: d, label: d }))}
         />
-        <span className="text-sm text-muted-foreground">{dados.length} registro(s)</span>
+      </div>
+
+      <CartoesResumo
+        itens={[
+          { rotulo: "Registros", valor: dados.length },
+          { rotulo: "Animais consumidos", valor: resumo.animais },
+          { rotulo: "Peso vivo", valor: formatarPeso(resumo.pesoVivo) },
+          { rotulo: "Peso de carne", valor: formatarPeso(resumo.pesoCarne) },
+        ]}
+      />
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <TabelaResumo titulo="Consumo por categoria" linhas={resumo.porCategoria} />
+        <TabelaResumo titulo="Consumo por destino" linhas={resumo.porDestino} />
       </div>
 
       {dados.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-12 text-muted-foreground">
-          <Beef className="size-8" />
-          <p>Nenhum registro de consumo encontrado.</p>
+          <Utensils className="size-8" />
+          <p>Nenhum registro de consumo no período.</p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {colunas.map((coluna) => (
-                <TableHead key={coluna.id} className={coluna.alinhamento === "right" ? "text-right" : undefined}>
-                  <button
-                    type="button"
-                    onClick={() => ordenarPor(coluna.id)}
-                    className={`inline-flex items-center gap-1 hover:text-foreground ${
-                      coluna.alinhamento === "right" ? "flex-row-reverse" : ""
-                    }`}
-                  >
-                    {coluna.rotulo}
-                    {ordenacao.coluna === coluna.id ? (
-                      ordenacao.desc ? (
-                        <ArrowDown className="size-3.5" />
+        <div className="max-h-[32rem] overflow-auto rounded-lg border">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-card">
+              <TableRow>
+                {colunas.map((coluna) => (
+                  <TableHead key={coluna.id} className={coluna.alinhamento === "right" ? "text-right" : undefined}>
+                    <button
+                      type="button"
+                      onClick={() => ordenarPor(coluna.id)}
+                      className={`inline-flex items-center gap-1 hover:text-foreground ${
+                        coluna.alinhamento === "right" ? "flex-row-reverse" : ""
+                      }`}
+                    >
+                      {coluna.rotulo}
+                      {ordenacao.coluna === coluna.id ? (
+                        ordenacao.desc ? (
+                          <ArrowDown className="size-3.5" />
+                        ) : (
+                          <ArrowUp className="size-3.5" />
+                        )
                       ) : (
-                        <ArrowUp className="size-3.5" />
-                      )
-                    ) : (
-                      <ArrowUpDown className="size-3.5 text-muted-foreground/50" />
-                    )}
-                  </button>
-                </TableHead>
-              ))}
-              {podeEditar && <TableHead className="w-24" />}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {dados.map((g) => (
-              <TableRow
-                key={g.ocorrencia_grupo_id}
-                className={podeEditar ? "cursor-pointer" : undefined}
-                onClick={() => podeEditar && setSelecionadoId(g.ocorrencia_grupo_id)}
-                title={g.animais.length > 0 ? `Animais: ${g.animais.map((a) => a.brinco ?? a.nome ?? a.tatuagem ?? "—").join(", ")}` : undefined}
-              >
-                <TableCell className="font-medium">{formatarData(g.data)}</TableCell>
-                <TableCell>{g.descricao ?? "—"}</TableCell>
-                <TableCell className="text-right tabular-nums">{g.animais.length}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatarPeso(g.peso_vivo)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatarPeso(g.peso_carne)}</TableCell>
-                <TableCell>{g.destino ?? "—"}</TableCell>
-                {podeEditar && (
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {g.ocorrencia_grupo_id === grupoMaisRecenteId && (
-                      <Button variant="ghost" size="sm" disabled={desfazendo} onClick={desfazer}>
-                        <Undo2 className="size-4" />
-                        Desfazer
-                      </Button>
-                    )}
-                  </TableCell>
-                )}
+                        <ArrowUpDown className="size-3.5 text-muted-foreground/50" />
+                      )}
+                    </button>
+                  </TableHead>
+                ))}
+                {podeEditar && <TableHead className="w-24" />}
               </TableRow>
-            ))}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell className="text-sm font-normal text-muted-foreground">
-                {dados.length} {dados.length === 1 ? "registro" : "registros"}
-              </TableCell>
-              <TableCell className="text-right font-medium">Total</TableCell>
-              <TableCell className="text-right font-medium tabular-nums">{totalAnimais}</TableCell>
-              <TableCell className="text-right font-medium tabular-nums">{formatarPeso(totalPesoVivo)}</TableCell>
-              <TableCell className="text-right font-medium tabular-nums">{formatarPeso(totalPesoCarne)}</TableCell>
-              <TableCell />
-              {podeEditar && <TableCell />}
-            </TableRow>
-          </TableFooter>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {dados.map((g) => (
+                <TableRow
+                  key={g.ocorrencia_grupo_id}
+                  className={podeEditar ? "cursor-pointer" : undefined}
+                  onClick={() => podeEditar && setSelecionadoId(g.ocorrencia_grupo_id)}
+                  title={`Animais: ${g.animais.map((a) => identificacaoAnimal(a)).join(", ")}`}
+                >
+                  <TableCell className="font-medium">{formatarData(g.data)}</TableCell>
+                  <TableCell>{g.descricao ?? "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{g.animais.length}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatarPeso(g.peso_vivo)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatarPeso(g.peso_carne)}</TableCell>
+                  <TableCell>{g.destino ?? "—"}</TableCell>
+                  {podeEditar && (
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {g.ocorrencia_grupo_id === grupoMaisRecenteId && (
+                        <Button variant="ghost" size="sm" disabled={desfazendo} onClick={desfazer}>
+                          <Undo2 className="size-4" />
+                          Desfazer
+                        </Button>
+                      )}
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell className="text-sm font-normal text-muted-foreground">
+                  {dados.length} {dados.length === 1 ? "registro" : "registros"}
+                </TableCell>
+                <TableCell className="text-right font-medium">Total</TableCell>
+                <TableCell className="text-right font-medium tabular-nums">{resumo.animais}</TableCell>
+                <TableCell className="text-right font-medium tabular-nums">{formatarPeso(resumo.pesoVivo)}</TableCell>
+                <TableCell className="text-right font-medium tabular-nums">{formatarPeso(resumo.pesoCarne)}</TableCell>
+                <TableCell />
+                {podeEditar && <TableCell />}
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </div>
       )}
 
-      {podeEditar && (
-        <DialogoConsumo
-          key={selecionadoId ?? "fechado"}
-          localId={localId}
-          grupo={selecionado}
-          animaisAtivos={animaisAtivos}
-          onFechar={() => setSelecionadoId(null)}
-        />
-      )}
+      {podeEditar && <DialogoConsumo localId={localId} grupo={selecionado} onFechar={() => setSelecionadoId(null)} />}
     </div>
   );
 }
