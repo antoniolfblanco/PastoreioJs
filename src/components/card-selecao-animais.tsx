@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Beef } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +69,7 @@ export function CardSelecaoAnimais({
   const [racasFiltro, setRacasFiltro] = useState<Set<string>>(new Set());
   const [sexosFiltro, setSexosFiltro] = useState<Set<string>>(new Set());
   const [grausSangueFiltro, setGrausSangueFiltro] = useState<Set<string>>(new Set());
+  const [quantidade, setQuantidade] = useState("");
 
   const animaisDaEspecie = useMemo(() => animais.filter((a) => a.especie === especie), [animais, especie]);
   const opcoes = useMemo(() => {
@@ -115,6 +116,15 @@ export function CardSelecaoAnimais({
       else novo.add(a.id);
     }
     onMarcadosChange(novo);
+  }
+
+  // Lote sem identificação: marca exatamente os N primeiros disponíveis da
+  // lista filtrada, na ordem mostrada (substitui a marcação atual).
+  const qtd = Number(quantidade);
+  const qtdValida = Number.isInteger(qtd) && qtd > 0;
+  function marcarPrimeiros() {
+    if (!qtdValida) return;
+    onMarcadosChange(new Set(disponiveisFiltrados.slice(0, qtd).map((a) => a.id)));
   }
 
   function trocarEspecie(nova: Especie) {
@@ -181,6 +191,38 @@ export function CardSelecaoAnimais({
             onChange={setGrausSangueFiltro}
             opcoes={grausSangue.map((g) => ({ value: g, label: g }))}
           />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Marcar os primeiros</span>
+          <Input
+            type="number"
+            min={1}
+            max={disponiveisFiltrados.length}
+            inputMode="numeric"
+            placeholder="Qtd"
+            className="h-8 w-24"
+            value={quantidade}
+            onChange={(e) => setQuantidade(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                marcarPrimeiros();
+              }
+            }}
+          />
+          <span className="text-sm text-muted-foreground">de {disponiveisFiltrados.length}</span>
+          <Button size="sm" variant="outline" disabled={!qtdValida || disponiveisFiltrados.length === 0} onClick={marcarPrimeiros}>
+            Marcar
+          </Button>
+          {marcados.size > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => onMarcadosChange(new Set())}>
+              Limpar
+            </Button>
+          )}
+          {qtdValida && qtd > disponiveisFiltrados.length && (
+            <span className="text-xs text-amber-600">Só há {disponiveisFiltrados.length} disponível(is) no filtro.</span>
+          )}
         </div>
 
         {filtrados.length === 0 ? (
