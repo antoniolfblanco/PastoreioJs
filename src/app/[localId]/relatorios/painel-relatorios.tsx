@@ -178,6 +178,7 @@ function RelatorioLotacao({
   const [especies, setEspecies] = useState<Set<Especie>>(new Set(["bovino"]));
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set(areas.map((a) => a.id)));
   const [mostrarVazias, setMostrarVazias] = useState(false);
+  const [mostrarValores, setMostrarValores] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -208,9 +209,9 @@ function RelatorioLotacao({
     setErro(null);
     try {
       const lista = ordenadas(especies);
-      const r = await buscarLotacaoAreas(localId, lista, Array.from(selecionadas), mostrarVazias);
+      const r = await buscarLotacaoAreas(localId, lista, Array.from(selecionadas), mostrarVazias, mostrarValores);
       if ("error" in r) return setErro(r.error);
-      await gerarPdfLotacao(localNome, lista, r.areas);
+      await gerarPdfLotacao(localNome, lista, r.areas, r.totais, mostrarValores);
     } catch (e) {
       setErro(erroDe(e));
     } finally {
@@ -229,6 +230,10 @@ function RelatorioLotacao({
         <div className="flex items-center gap-2">
           <Checkbox id="lot-vazias" checked={mostrarVazias} onCheckedChange={(v) => setMostrarVazias(v === true)} />
           <Label htmlFor="lot-vazias">Mostrar áreas vazias</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox id="lot-valores" checked={mostrarValores} onCheckedChange={(v) => setMostrarValores(v === true)} />
+          <Label htmlFor="lot-valores">Mostrar valores</Label>
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">

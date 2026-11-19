@@ -2,7 +2,13 @@
 // Flutter (relatorio_movimentacoes_screen, relatorio_lotacao_areas_screen,
 // relatorio_venda_pdf, relatorio_mortes_pdf) e o do Diário.
 import { RelatorioPdf, COR_VERDE, COR_VERMELHO, dataBr, reais, type LinhaPdf } from "@/lib/pdf";
-import type { LinhaMovimentacao, LotacaoArea, ResumoEspecie, ValoresCiclo } from "@/lib/actions/relatorios";
+import type {
+  LinhaMovimentacao,
+  LotacaoArea,
+  ResumoEspecie,
+  TotalCategoriaLotacao,
+  ValoresCiclo,
+} from "@/lib/actions/relatorios";
 import type { EventoDiario } from "@/lib/actions/diario";
 import { rotulosTipoDiario } from "@/lib/diario-tipos";
 
@@ -135,7 +141,13 @@ function blocoValores(pdf: RelatorioPdf, v: ValoresCiclo) {
 // ---------------------------------------------------------------------------
 // Lotação por Área (retrato)
 
-export async function gerarPdfLotacao(localNome: string, especies: (keyof typeof rotulosEspecie)[], areas: LotacaoArea[]) {
+export async function gerarPdfLotacao(
+  localNome: string,
+  especies: (keyof typeof rotulosEspecie)[],
+  areas: LotacaoArea[],
+  totais: TotalCategoriaLotacao[] = [],
+  mostrarValores = false,
+) {
   const pdf = await RelatorioPdf.criar("retrato");
   const hoje = new Date().toLocaleDateString("pt-BR");
   pdf.titulo(`${localNome} - Lotação por Área em ${hoje}`, `Espécies: ${especies.map((e) => rotulosEspecie[e]).join(", ")}`);
@@ -198,6 +210,41 @@ export async function gerarPdfLotacao(localNome: string, especies: (keyof typeof
         tamanhoFonte: 9,
       });
       pdf.espaco(12);
+    }
+  }
+
+  // Fechamento: quantidade (e valor) por categoria somando todas as áreas.
+  if (totais.length > 0) {
+    const comValor = mostrarValores && totais.some((t) => t.valor != null);
+    const linhas: LinhaPdf[] = [];
+    for (const [grupo, lista] of porGrupo(totais)) {
+      if (grupo) {
+        const qtd = lista.reduce((s, t) => s + t.total, 0);
+        const valor = lista.reduce((s, t) => s + (t.valor ?? 0), 0);
+        linhas.push({ celulas: [grupo, String(qtd), ...(comValor ? [reais(valor)] : [])], estilo: "grupo" });
+      }
+      for (const t of lista) {
+        linhas.push([
+          grupo ? `   ${t.categoria}` : t.categoria,
+          String(t.total),
+          ...(comValor ? [reais(t.valor ?? 0)] : []),
+        ]);
+      }
+    }
+    const qtdTotal = totais.reduce((s, t) => s + t.total, 0);
+    const valorTotal = totais.reduce((s, t) => s + (t.valor ?? 0), 0);
+    pdf.garantirEspaco(80);
+    pdf.secao("Total por categoria", 11);
+    pdf.tabela({
+      cabecalho: ["Categoria", "Quantidade", ...(comValor ? ["Valor total"] : [])],
+      linhas,
+      rodape: [["Total da propriedade", String(qtdTotal), ...(comValor ? [reais(valorTotal)] : [])]],
+      larguras: comValor ? [3, 1, 1.6] : [4, 1],
+      direita: comValor ? [1, 2] : [1],
+      tamanhoFonte: 9,
+    });
+    if (comValor && qtdTotal > 0) {
+      pdf.texto(`Valor médio por cabeça: ${reais(valorTotal / qtdTotal)}`, { tamanho: 8 });
     }
   }
 

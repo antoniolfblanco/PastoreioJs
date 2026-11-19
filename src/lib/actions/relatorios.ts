@@ -206,12 +206,17 @@ export type LotacaoArea = {
 
 // Lotação atual (foto de agora) por área, nas espécies escolhidas. Categoria
 // zerada some sempre; área zerada só aparece com mostrarVazias.
+// Total por categoria somando as áreas escolhidas; `valor` só quando o
+// relatório pede valores (valor de estoque atual: valor_atual ou valor).
+export type TotalCategoriaLotacao = { categoria: string; grupo: string | null; total: number; valor: number | null };
+
 export async function buscarLotacaoAreas(
   localId: string,
   especies: Especie[],
   areaIds: string[],
   mostrarVazias: boolean,
-): Promise<{ areas: LotacaoArea[] } | { error: string }> {
+  mostrarValores = false,
+): Promise<{ areas: LotacaoArea[]; totais: TotalCategoriaLotacao[] } | { error: string }> {
   if (especies.length === 0) return { error: "Escolha ao menos uma espécie." };
   if (areaIds.length === 0) return { error: "Selecione ao menos uma área." };
   const supabase = await criarClienteServidor();
@@ -285,5 +290,46 @@ export async function buscarLotacaoAreas(
       });
   }
 
-  return { areas: resultado };
+  // Totais por categoria nas áreas escolhidas.
+  const qtdPorCategoria = new Map<string, number>();
+  for (const areaId of ids) {
+    for (const [categoriaId, n] of porArea.get(areaId) ?? []) {
+      qtdPorCategoria.set(categoriaId, (qtdPorCategoria.get(categoriaId) ?? 0) + n);
+    }
+  }
+
+  let valorPorCategoria: Map<string, number> | null = null;
+  if (mostrarValores) {
+    valorPorCategoria = new Map();
+    // Paginado: o PostgREST devolve no máximo 1000 linhas por chamada.
+    const tamanho = 1000;
+    for (let inicio = 0; ; inicio += tamanho) {
+      const { data, error } = await supabase
+        // Mesma base da contagem (rebanho próprio e ativo).
+        .from("animal_rebanho")
+        .select("id, categoria_id, valor, valor_atual")
+        .eq("local_id", localId)
+        .in("especie", especies)
+        .in("area_id", areaIds)
+        .order("id")
+        .range(inicio, inicio + tamanho - 1);
+      if (error) return { error: "Não foi possível carregar os valores: " + error.message };
+      for (const a of data ?? []) {
+        const v = numero(a.valor_atual ?? a.valor);
+        valorPorCategoria.set(a.categoria_id, (valorPorCategoria.get(a.categoria_id) ?? 0) + v);
+      }
+      if ((data ?? []).length < tamanho) break;
+    }
+  }
+
+  const totais: TotalCategoriaLotacao[] = categoriasOrdenadas
+    .filter((c) => (qtdPorCategoria.get(c.id) ?? 0) > 0)
+    .map((c) => ({
+      categoria: c.descricao as string,
+      grupo: (c.grupo_id && nomeGrupoCat.get(c.grupo_id)) || null,
+      total: qtdPorCategoria.get(c.id)!,
+      valor: valorPorCategoria ? (valorPorCategoria.get(c.id) ?? 0) : null,
+    }));
+
+  return { areas: resultado, totais };
 }
