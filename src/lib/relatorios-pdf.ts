@@ -42,8 +42,10 @@ const colunasMov: { rotulo: string; valor: (l: LinhaMovimentacao) => number; sin
   { rotulo: "Est. Inicial", valor: (l) => l.estoqueInicial },
   { rotulo: "Compra", valor: (l) => l.compra },
   { rotulo: "Nascim.", valor: (l) => l.nascimento },
+  { rotulo: "Transf. E.", valor: (l) => l.transferenciaEntrada },
   { rotulo: "Entr. Cat.", valor: (l) => l.entradaCategoria },
   { rotulo: "Venda", valor: (l) => l.venda },
+  { rotulo: "Transf. S.", valor: (l) => l.transferenciaSaida },
   { rotulo: "Morte", valor: (l) => l.morte },
   { rotulo: "Saída Cat.", valor: (l) => l.saidaCategoria },
   { rotulo: "Consumo", valor: (l) => l.consumo },
@@ -79,7 +81,7 @@ export async function gerarPdfMovimentacoes(localNome: string, cicloNome: string
       cabecalho: ["Categoria", ...colunasMov.map((c) => c.rotulo)],
       linhas,
       rodape: [["Total", ...somas(e.linhas)]],
-      larguras: [3, 1.3, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.3],
+      larguras: [2.8, 1.2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.2],
       direita: colunasMov.map((_, i) => i + 1),
     });
     if (e.valores && temMovimentoValor(e.valores)) {

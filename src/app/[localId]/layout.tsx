@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronDown, Check, TriangleAlert } from "lucide-react";
-import { buscarLocalAtual } from "@/lib/local";
+import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { sair } from "@/lib/actions/auth";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -70,6 +70,7 @@ const navegacaoReproducao = [
 const navegacaoComprasVendas = [
   { rotulo: "Comprar Animais", href: "/compras" },
   { rotulo: "Vender Animais", href: "/vendas" },
+  { rotulo: "Transferências", href: "/transferencias" },
   { rotulo: "Revalorização de Animais", href: "/revalorizacao" },
 ];
 
@@ -94,9 +95,14 @@ export default async function LocalLayout({
   const local = await buscarLocalAtual(localId);
 
   const supabase = await criarClienteServidor();
-  const [{ data: meusLocais }, { data: cicloAtivo }] = await Promise.all([
+  const [{ data: meusLocais }, { data: cicloAtivo }, { count: pendentesRecebidas }] = await Promise.all([
     supabase.from("usuario_locais").select("local_id, locais(id, nome)").order("criado_em"),
     supabase.from("ciclos").select("id").eq("local_id", localId).eq("ativo", true).maybeSingle(),
+    supabase
+      .from("transferencias")
+      .select("id", { count: "exact", head: true })
+      .eq("local_destino_id", localId)
+      .eq("status", "pendente"),
   ]);
 
   const outrosLocais = (meusLocais ?? [])
@@ -166,6 +172,20 @@ export default async function LocalLayout({
           </form>
         </header>
         <main className="flex min-w-0 flex-1 flex-col p-6">
+          {/* Transferência de outra fazenda esperando confirmação aqui. */}
+          {!!pendentesRecebidas && podeGerenciarConteudo(local.perfil) && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+              <span className="flex items-center gap-2">
+                <TriangleAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                {pendentesRecebidas === 1
+                  ? "Há 1 transferência de animais aguardando o seu recebimento."
+                  : `Há ${pendentesRecebidas} transferências de animais aguardando o seu recebimento.`}
+              </span>
+              <Link href={`/${localId}/transferencias`} className={buttonVariants({ size: "sm", variant: "outline" })}>
+                Ver transferências
+              </Link>
+            </div>
+          )}
           {/* Sem ciclo ativo, o estoque inicial não é registrado e os resumos
               por ciclo ficam sem referência — aviso em toda tela até criar. */}
           {!cicloAtivo && (

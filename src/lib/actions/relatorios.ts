@@ -21,6 +21,8 @@ export type LinhaMovimentacao = {
   consumo: number;
   furto: number;
   acertoContagem: number;
+  transferenciaEntrada: number;
+  transferenciaSaida: number;
   estoqueAtual: number;
 };
 
@@ -101,7 +103,7 @@ export async function buscarResumoMovimentacoes(
         .order("ordem")
         .order("descricao"),
       supabase.from("grupos_categoria").select("id, nome, ordem").eq("local_id", localId).eq("especie", especie),
-      supabase.rpc("resumo_movimentacoes_por_categoria", {
+      supabase.rpc("resumo_movimentacoes_por_categoria_v2", {
         p_local_id: localId,
         p_especie: especie,
         p_data_inicio: ciclo.data_inicio,
@@ -139,14 +141,17 @@ export async function buscarResumoMovimentacoes(
         consumo: numero(m.consumo),
         furto: numero(m.furto),
         acertoContagem: numero(m.acerto_contagem),
+        transferenciaEntrada: numero(m.transferencia_entrada),
+        transferenciaSaida: numero(m.transferencia_saida),
       };
       const estoqueAtual =
         l.estoqueInicial +
         l.compra +
         l.nascimento +
         l.entradaCategoria +
+        l.transferenciaEntrada +
         l.acertoContagem -
-        (l.venda + l.morte + l.saidaCategoria + l.consumo + l.furto);
+        (l.venda + l.morte + l.saidaCategoria + l.consumo + l.furto + l.transferenciaSaida);
       const temAlgo =
         l.estoqueInicial !== 0 ||
         l.compra !== 0 ||
@@ -157,7 +162,9 @@ export async function buscarResumoMovimentacoes(
         l.saidaCategoria !== 0 ||
         l.consumo !== 0 ||
         l.furto !== 0 ||
-        l.acertoContagem !== 0;
+        l.acertoContagem !== 0 ||
+        l.transferenciaEntrada !== 0 ||
+        l.transferenciaSaida !== 0;
       if (mostrarVazias || temAlgo) linhas.push({ ...l, estoqueAtual });
     }
 
