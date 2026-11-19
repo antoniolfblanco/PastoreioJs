@@ -75,6 +75,7 @@ function RelatorioMovimentacoes({
   const [data, setData] = useState(dataMaxima(inicial));
   const [especies, setEspecies] = useState<Set<Especie>>(new Set(["bovino"]));
   const [mostrarVazias, setMostrarVazias] = useState(false);
+  const [mostrarValores, setMostrarValores] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -90,9 +91,9 @@ function RelatorioMovimentacoes({
     setGerando(true);
     setErro(null);
     try {
-      const r = await buscarResumoMovimentacoes(localId, ciclo.id, data, ordenadas(especies), mostrarVazias);
+      const r = await buscarResumoMovimentacoes(localId, ciclo.id, data, ordenadas(especies), mostrarVazias, mostrarValores);
       if ("error" in r) return setErro(r.error);
-      await gerarPdfMovimentacoes(localNome, r.cicloNome, data, r.especies);
+      await gerarPdfMovimentacoes(localNome, r.cicloNome, data, r.especies, mostrarValores);
     } catch (e) {
       setErro(erroDe(e));
     } finally {
@@ -150,6 +151,10 @@ function RelatorioMovimentacoes({
         <div className="flex items-center gap-2">
           <Checkbox id="mov-vazias" checked={mostrarVazias} onCheckedChange={(v) => setMostrarVazias(v === true)} />
           <Label htmlFor="mov-vazias">Mostrar categorias vazias</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox id="mov-valores" checked={mostrarValores} onCheckedChange={(v) => setMostrarValores(v === true)} />
+          <Label htmlFor="mov-valores">Mostrar valores</Label>
         </div>
         {podeEditar && <BotaoGrupos localId={localId} tipo="categoria" className="self-start" />}
         {erro && <p className="text-sm text-destructive">{erro}</p>}

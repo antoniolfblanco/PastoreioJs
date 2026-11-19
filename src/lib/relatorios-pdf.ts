@@ -1,7 +1,7 @@
 // Os PDFs do PastoreioJS, com o mesmo conteúdo e visual dos PDFs do app
 // Flutter (relatorio_movimentacoes_screen, relatorio_lotacao_areas_screen,
 // relatorio_venda_pdf, relatorio_mortes_pdf) e o do Diário.
-import { RelatorioPdf, COR_VERDE, COR_VERMELHO, dataBr, reais, type LinhaPdf } from "@/lib/pdf";
+import { RelatorioPdf, COR_VERDE, COR_VERMELHO, dataBr, hojeIso, reais, type LinhaPdf } from "@/lib/pdf";
 import type {
   LinhaMovimentacao,
   LotacaoArea,
@@ -67,30 +67,53 @@ function somas(linhas: LinhaMovimentacao[]) {
   });
 }
 
-export async function gerarPdfMovimentacoes(localNome: string, cicloNome: string, dataFim: string, especies: ResumoEspecie[]) {
+function somaValor(linhas: LinhaMovimentacao[]) {
+  return reais(linhas.reduce((t, l) => t + (l.valorAtual ?? 0), 0));
+}
+
+export async function gerarPdfMovimentacoes(
+  localNome: string,
+  cicloNome: string,
+  dataFim: string,
+  especies: ResumoEspecie[],
+  mostrarValores = false,
+) {
   const pdf = await RelatorioPdf.criar("paisagem");
   pdf.titulo(`${localNome} - Resumo de Movimentações em ${dataBr(dataFim)}. Ciclo ${cicloNome}`);
+  // O valor por categoria é o de hoje; numa data passada, avisa.
+  const valorDeHoje = dataFim < hojeIso();
 
   for (const e of especies) {
     pdf.secao(rotulosEspecie[e.especie]);
+    const extra = (itens: LinhaMovimentacao[]) => (mostrarValores ? [somaValor(itens)] : []);
     const linhas: LinhaPdf[] = [];
     for (const [grupo, itens] of porGrupo(e.linhas)) {
-      if (grupo) linhas.push({ celulas: [grupo, ...somas(itens)], estilo: "grupo" });
+      if (grupo) linhas.push({ celulas: [grupo, ...somas(itens), ...extra(itens)], estilo: "grupo" });
       for (const l of itens) {
         linhas.push([
           grupo ? `   ${l.categoria}` : l.categoria,
           ...colunasMov.map((c) => (c.sinal ? comSinal(c.valor(l)) : String(c.valor(l)))),
+          ...(mostrarValores ? [reais(l.valorAtual ?? 0)] : []),
         ]);
       }
     }
     pdf.tabela({
-      cabecalho: ["Categoria", ...colunasMov.map((c) => c.rotulo)],
+      cabecalho: [
+        "Categoria",
+        ...colunasMov.map((c) => c.rotulo),
+        ...(mostrarValores ? [valorDeHoje ? "Valor (hoje)" : "Valor atual"] : []),
+      ],
       linhas,
-      rodape: [["Total", ...somas(e.linhas)]],
-      larguras: [2.8, 1.2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.2],
-      direita: colunasMov.map((_, i) => i + 1),
+      rodape: [["Total", ...somas(e.linhas), ...extra(e.linhas)]],
+      larguras: mostrarValores
+        ? [2.6, 1.1, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 1.1, 1.9]
+        : [2.8, 1.2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.2],
+      direita: [...colunasMov.map((_, i) => i + 1), ...(mostrarValores ? [colunasMov.length + 1] : [])],
     });
-    if (e.valores && temMovimentoValor(e.valores)) {
+    if (mostrarValores && valorDeHoje) {
+      pdf.texto("Valor por categoria do rebanho de hoje (a data do relatório é anterior).", { tamanho: 7 });
+    }
+    if (mostrarValores && e.valores && temMovimentoValor(e.valores)) {
       pdf.espaco(6);
       blocoValores(pdf, e.valores);
     }
@@ -172,7 +195,11 @@ export async function gerarPdfLotacao(
   }
 
   for (const [grupo, lista] of blocos) {
-    if (grupo) {
+    if (grupo && lista.length === 1) {
+      // Grupo de uma área só: o consolidado seria igual à tabela da área.
+      pdf.garantirEspaco(60);
+      pdf.secao(grupo, 11);
+    } else if (grupo) {
       // Cabeçalho do grupo: o consolidado das áreas dele, por categoria.
       const somadas = new Map<string, { categoria: string; grupo: string | null; total: number }>();
       for (const a of lista)

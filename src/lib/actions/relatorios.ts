@@ -24,6 +24,8 @@ export type LinhaMovimentacao = {
   transferenciaEntrada: number;
   transferenciaSaida: number;
   estoqueAtual: number;
+  // Valor de estoque de hoje (só quando o relatório pede valores).
+  valorAtual: number | null;
 };
 
 // Reconciliação de valor do ciclo (RPC resumo_valores_ciclo), que fecha o
@@ -65,12 +67,43 @@ function ordenarPorGrupo<T extends { grupo_id: string | null }>(itens: T[], orde
     .map((x) => x.item);
 }
 
+type Cliente = Awaited<ReturnType<typeof criarClienteServidor>>;
+
+// Valor de estoque atual (valor_atual, ou valor) somado por categoria, do
+// rebanho próprio e ativo de hoje. Paginado: o PostgREST devolve no máximo
+// 1000 linhas por chamada.
+async function valoresPorCategoria(
+  supabase: Cliente,
+  localId: string,
+  especies: Especie[],
+  areaIds: string[] | null,
+): Promise<Map<string, number> | { error: string }> {
+  const valores = new Map<string, number>();
+  const tamanho = 1000;
+  for (let inicio = 0; ; inicio += tamanho) {
+    let consulta = supabase
+      .from("animal_rebanho")
+      .select("id, categoria_id, valor, valor_atual")
+      .eq("local_id", localId)
+      .in("especie", especies);
+    if (areaIds) consulta = consulta.in("area_id", areaIds);
+    const { data, error } = await consulta.order("id").range(inicio, inicio + tamanho - 1);
+    if (error) return { error: "Não foi possível carregar os valores: " + error.message };
+    for (const a of data ?? []) {
+      valores.set(a.categoria_id, (valores.get(a.categoria_id) ?? 0) + numero(a.valor_atual ?? a.valor));
+    }
+    if ((data ?? []).length < tamanho) break;
+  }
+  return valores;
+}
+
 export async function buscarResumoMovimentacoes(
   localId: string,
   cicloId: string,
   dataFim: string,
   especies: Especie[],
   mostrarVazias: boolean,
+  mostrarValores = false,
 ): Promise<{ especies: ResumoEspecie[]; cicloNome: string } | { error: string }> {
   if (especies.length === 0) return { error: "Escolha ao menos uma espécie." };
   const supabase = await criarClienteServidor();
@@ -93,6 +126,12 @@ export async function buscarResumoMovimentacoes(
 
   const resultado: ResumoEspecie[] = [];
   for (const especie of especies) {
+    let valorPorCategoria: Map<string, number> | null = null;
+    if (mostrarValores) {
+      const v = await valoresPorCategoria(supabase, localId, [especie], null);
+      if ("error" in v) return v;
+      valorPorCategoria = v;
+    }
     const [categorias, grupos, movimentos, valores] = await Promise.all([
       supabase
         .from("categorias")
@@ -165,7 +204,8 @@ export async function buscarResumoMovimentacoes(
         l.acertoContagem !== 0 ||
         l.transferenciaEntrada !== 0 ||
         l.transferenciaSaida !== 0;
-      if (mostrarVazias || temAlgo) linhas.push({ ...l, estoqueAtual });
+      const valorAtual = valorPorCategoria ? (valorPorCategoria.get(c.id) ?? 0) : null;
+      if (mostrarVazias || temAlgo || (valorAtual ?? 0) !== 0) linhas.push({ ...l, estoqueAtual, valorAtual });
     }
 
     const v = (valores.data ?? null) as Record<string, unknown> | null;
@@ -300,26 +340,9 @@ export async function buscarLotacaoAreas(
 
   let valorPorCategoria: Map<string, number> | null = null;
   if (mostrarValores) {
-    valorPorCategoria = new Map();
-    // Paginado: o PostgREST devolve no máximo 1000 linhas por chamada.
-    const tamanho = 1000;
-    for (let inicio = 0; ; inicio += tamanho) {
-      const { data, error } = await supabase
-        // Mesma base da contagem (rebanho próprio e ativo).
-        .from("animal_rebanho")
-        .select("id, categoria_id, valor, valor_atual")
-        .eq("local_id", localId)
-        .in("especie", especies)
-        .in("area_id", areaIds)
-        .order("id")
-        .range(inicio, inicio + tamanho - 1);
-      if (error) return { error: "Não foi possível carregar os valores: " + error.message };
-      for (const a of data ?? []) {
-        const v = numero(a.valor_atual ?? a.valor);
-        valorPorCategoria.set(a.categoria_id, (valorPorCategoria.get(a.categoria_id) ?? 0) + v);
-      }
-      if ((data ?? []).length < tamanho) break;
-    }
+    const v = await valoresPorCategoria(supabase, localId, especies, areaIds);
+    if ("error" in v) return v;
+    valorPorCategoria = v;
   }
 
   const totais: TotalCategoriaLotacao[] = categoriasOrdenadas
