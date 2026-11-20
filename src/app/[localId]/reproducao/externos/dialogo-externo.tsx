@@ -298,6 +298,7 @@ export function DialogoExterno({
         aberto={seletorAberto === "pai"}
         titulo="Selecionar pai"
         sexo="macho"
+        especie={especieFiltro}
         candidatos={candidatos}
         excluirId={existente?.id}
         onSelecionar={(id, resumo) => {
@@ -311,6 +312,7 @@ export function DialogoExterno({
         aberto={seletorAberto === "mae"}
         titulo="Selecionar mãe"
         sexo="femea"
+        especie={especieFiltro}
         candidatos={candidatos}
         excluirId={existente?.id}
         onSelecionar={(id, resumo) => {

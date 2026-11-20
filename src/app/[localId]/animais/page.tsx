@@ -3,6 +3,7 @@ import { buscarRefsAnimais } from "@/lib/identificacao-parentes";
 import type { OpcaoPelagem } from "@/components/campo-pelagem";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { TabelaAnimais } from "./tabela-animais";
+import type { CandidatoParente } from "./seletor-animal-dialog";
 
 export type Especie = "bovino" | "ovino" | "equino";
 export type Sexo = "macho" | "femea" | "desconhecido";
@@ -85,6 +86,48 @@ async function buscarTodosAnimais(supabase: ClienteServidor, localId: string) {
   return todos;
 }
 
+const etiquetaSituacao: Record<string, string> = {
+  vendido: "vendido",
+  morto: "morto",
+  consumido: "consumido",
+  furtado: "furtado",
+  transferido: "transferido",
+  ajustado: "baixa de contagem",
+};
+
+// Candidatos a pai/mãe fora do rebanho ativo: os externos (cadastrados só
+// para genealogia) e os próprios que já saíram. Paginado como o rebanho.
+async function buscarOutrosParentes(supabase: ClienteServidor, localId: string): Promise<CandidatoParente[]> {
+  const TAMANHO_PAGINA = 1000;
+  const todos: CandidatoParente[] = [];
+  for (let pagina = 0; ; pagina++) {
+    const { data, error } = await supabase
+      .from("animais")
+      .select("id, nome, brinco, tatuagem, sexo, especie, castrado, origem_registro, situacao, racas(descricao)")
+      .eq("local_id", localId)
+      .neq("situacao", "ativo")
+      .order("criado_em", { ascending: false })
+      .range(pagina * TAMANHO_PAGINA, pagina * TAMANHO_PAGINA + TAMANHO_PAGINA - 1);
+    if (error) throw new Error(error.message);
+    for (const a of data ?? []) {
+      todos.push({
+        id: a.id,
+        nome: a.nome,
+        brinco: a.brinco,
+        tatuagem: a.tatuagem,
+        sexo: a.sexo as Sexo,
+        especie: a.especie as Especie,
+        castrado: a.castrado,
+        raca_descricao: primeiro(a.racas as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "",
+        etiqueta: a.origem_registro === "externo" ? "externo" : (etiquetaSituacao[a.situacao] ?? a.situacao),
+      });
+    }
+    if (!data || data.length < TAMANHO_PAGINA) break;
+  }
+  // Externos primeiro: são os que estão aqui justamente para genealogia.
+  return todos.sort((a, b) => Number(b.etiqueta === "externo") - Number(a.etiqueta === "externo"));
+}
+
 export default async function AnimaisPage({
   params,
   searchParams,
@@ -105,6 +148,7 @@ export default async function AnimaisPage({
     { data: categoriasIvz, error: erroCategoriasIvz },
     { data: ciclo },
     { data: pelagens },
+    outrosParentes,
   ] = await Promise.all([
     buscarTodosAnimais(supabase, localId),
     supabase.from("areas").select("id, nome").eq("local_id", localId).eq("ativo", true).order("ordem"),
@@ -118,6 +162,7 @@ export default async function AnimaisPage({
     supabase.from("categorias_ivz").select("id, nome, especie, sexo").eq("ativo", true).order("ordem"),
     supabase.from("ciclos").select("id, nome").eq("local_id", localId).eq("ativo", true).maybeSingle(),
     supabase.from("pelagens").select("id, descricao").eq("local_id", localId).eq("ativo", true).order("descricao"),
+    buscarOutrosParentes(supabase, localId),
   ]);
 
   if (erroAreas || erroCategorias || erroRacas || erroCategoriasIvz) {
@@ -157,6 +202,7 @@ export default async function AnimaisPage({
         racas={(racas as OpcaoRaca[]) ?? []}
         pelagens={(pelagens as OpcaoPelagem[]) ?? []}
         localNome={local.nome}
+        outrosParentes={outrosParentes}
         categoriasIvz={(categoriasIvz as CategoriaIvz[]) ?? []}
         cicloAtivoNome={ciclo?.nome ?? null}
         podeEditar={podeGerenciarConteudo(local.perfil)}

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { CandidatoGenealogia } from "./page";
+import type { CandidatoGenealogia, Especie } from "./page";
 
 export function identificacaoCompleta(a: CandidatoGenealogia) {
   const base = [a.brinco, a.tatuagem, a.nome, a.raca_descricao].filter(Boolean).join(" • ") || "Sem identificação";
@@ -18,6 +18,7 @@ export function SeletorAnimalParente({
   aberto,
   titulo,
   sexo,
+  especie,
   candidatos,
   excluirId,
   onSelecionar,
@@ -26,6 +27,7 @@ export function SeletorAnimalParente({
   aberto: boolean;
   titulo: string;
   sexo: "macho" | "femea";
+  especie?: Especie;
   candidatos: CandidatoGenealogia[];
   excluirId?: string;
   onSelecionar: (id: string, resumo: string) => void;
@@ -38,11 +40,12 @@ export function SeletorAnimalParente({
     return candidatos.filter((a) => {
       if (a.id === excluirId) return false;
       if (a.sexo !== sexo) return false;
+      if (especie && a.especie !== especie) return false;
       if (a.castrado) return false;
       if (!buscaMin) return true;
       return [a.nome, a.brinco, a.tatuagem].filter(Boolean).some((texto) => texto!.toLowerCase().includes(buscaMin));
     });
-  }, [candidatos, busca, sexo, excluirId]);
+  }, [candidatos, busca, sexo, especie, excluirId]);
 
   function fechar(estaAberto: boolean) {
     if (estaAberto) return;

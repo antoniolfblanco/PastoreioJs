@@ -23,7 +23,7 @@ import { CampoCategoria } from "./campo-categoria";
 import { CampoRaca } from "./campo-raca";
 import { CampoPelagem, type OpcaoPelagem } from "@/components/campo-pelagem";
 import { BotaoGenealogia } from "@/components/genealogia";
-import { SeletorAnimalDialog, identificacaoCompleta } from "./seletor-animal-dialog";
+import { SeletorAnimalDialog, identificacaoCompleta, type CandidatoParente } from "./seletor-animal-dialog";
 import type { Animal, CategoriaIvz, Especie, OpcaoArea, OpcaoCategoria, OpcaoRaca } from "./page";
 
 const rotulosEspecie: Record<Especie, string> = { bovino: "Bovino", ovino: "Ovino", equino: "Equino" };
@@ -56,6 +56,8 @@ type Props = {
   racas: OpcaoRaca[];
   pelagens: OpcaoPelagem[];
   localNome: string;
+  // Externos e próprios que já saíram do rebanho, para pai/mãe.
+  outrosParentes: CandidatoParente[];
   categoriasIvz: CategoriaIvz[];
   temCicloAtivo: boolean;
   onFechar: () => void;
@@ -70,6 +72,7 @@ export function DialogoAnimal({
   racas,
   pelagens,
   localNome,
+  outrosParentes,
   categoriasIvz,
   temCicloAtivo,
   onFechar,
@@ -103,9 +106,13 @@ export function DialogoAnimal({
   const [castrado, setCastrado] = useState(existente?.castrado ?? false);
   const [valor, setValor] = useState(existente?.valor != null ? String(existente.valor) : "");
 
-  const paiInicial = existente?.pai_id ? animais.find((a) => a.id === existente.pai_id) : null;
-  const maeInicial = existente?.mae_id ? animais.find((a) => a.id === existente.mae_id) : null;
-  const receptoraInicial = existente?.receptora_id ? animais.find((a) => a.id === existente.receptora_id) : null;
+  const candidatos = useMemo<CandidatoParente[]>(
+    () => [...animais.map((a) => ({ ...a, etiqueta: null })), ...outrosParentes],
+    [animais, outrosParentes],
+  );
+  const paiInicial = existente?.pai_id ? candidatos.find((a) => a.id === existente.pai_id) : null;
+  const maeInicial = existente?.mae_id ? candidatos.find((a) => a.id === existente.mae_id) : null;
+  const receptoraInicial = existente?.receptora_id ? candidatos.find((a) => a.id === existente.receptora_id) : null;
   const [paiId, setPaiId] = useState(existente?.pai_id ?? "");
   const [paiResumo, setPaiResumo] = useState(paiInicial ? identificacaoCompleta(paiInicial) : (existente?.pai_identificacao ?? ""));
   const [maeId, setMaeId] = useState(existente?.mae_id ?? "");
@@ -435,7 +442,8 @@ export function DialogoAnimal({
         aberto={seletorAberto === "pai"}
         titulo="Selecionar pai"
         sexo="macho"
-        animais={animais}
+        candidatos={candidatos}
+        especie={especieFiltro}
         excluirId={existente?.id}
         onSelecionar={(id, resumo) => {
           setPaiId(id);
@@ -447,7 +455,8 @@ export function DialogoAnimal({
         aberto={seletorAberto === "mae"}
         titulo="Selecionar mãe"
         sexo="femea"
-        animais={animais}
+        candidatos={candidatos}
+        especie={especieFiltro}
         excluirId={existente?.id}
         onSelecionar={(id, resumo) => {
           setMaeId(id);
@@ -459,7 +468,9 @@ export function DialogoAnimal({
         aberto={seletorAberto === "receptora"}
         titulo="Selecionar receptora"
         sexo="femea"
-        animais={animais}
+        somenteRebanho
+        candidatos={candidatos}
+        especie={especieFiltro}
         excluirId={existente?.id}
         onSelecionar={(id, resumo) => {
           setReceptoraId(id);
