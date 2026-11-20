@@ -40,15 +40,18 @@ export function DialogoCriarCategoria({
   const [resultado, acao, emAndamento] = useActionState(salvarCategoria, undefined);
   const ivzDaEspecie = useMemo(() => categoriasIvz.filter((c) => c.especie === especie), [categoriasIvz, especie]);
   const [categoriaIvzId, setCategoriaIvzId] = useState("");
-  const [descricao, setDescricao] = useState("");
+  // null = ainda não digitou: a descrição acompanha o nome da IVZ escolhida.
+  // Depois de mexer no campo, vale o que foi digitado, mesmo vazio.
+  const [descricaoDigitada, setDescricaoDigitada] = useState<string | null>(null);
   const [ativo, setAtivo] = useState(true);
   const ivzSelecionada = ivzDaEspecie.find((c) => c.id === categoriaIvzId);
+  const descricao = descricaoDigitada ?? ivzSelecionada?.nome ?? "";
 
   useEffect(() => {
     if (resultado === undefined || resultado.erro || !resultado.id || !resultado.sexo) return;
     onCriada({
       id: resultado.id,
-      descricao: descricao || ivzSelecionada?.nome || "",
+      descricao,
       especie,
       sexo: resultado.sexo as OpcaoCategoria["sexo"],
     });
@@ -94,8 +97,8 @@ export function DialogoCriarCategoria({
                 id="descricaoNovaCategoria"
                 name="descricao"
                 required
-                value={descricao || ivzSelecionada?.nome || ""}
-                onChange={(e) => setDescricao(e.target.value)}
+                value={descricao}
+                onChange={(e) => setDescricaoDigitada(e.target.value)}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
