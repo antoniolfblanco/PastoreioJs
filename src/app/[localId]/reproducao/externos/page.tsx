@@ -1,3 +1,4 @@
+import { buscarRefsAnimais } from "@/lib/identificacao-parentes";
 import { buscarLocalAtual, ehGerente } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ListaExternos } from "./lista-externos";
@@ -125,8 +126,7 @@ export default async function ExternosPage({
       .select(
         `id, nome, brinco, tatuagem, data_nascimento, sexo, especie, categoria_id, raca_id,
          grau_sangue, registro_provisorio, registro_definitivo, observacoes, pai_id, mae_id,
-         categorias!categoria_id(descricao), racas(descricao),
-         pai:animais!pai_id(nome, brinco, tatuagem), mae:animais!mae_id(nome, brinco, tatuagem)`,
+         categorias!categoria_id(descricao), racas(descricao)`,
       )
       .eq("local_id", localId)
       .eq("origem_registro", "externo")
@@ -143,6 +143,11 @@ export default async function ExternosPage({
         (erroExternos?.message || erroCategorias?.message || erroRacas?.message || erroCategoriasIvz?.message),
     );
   }
+
+  const refs = await buscarRefsAnimais(
+    supabase,
+    (externosRaw ?? []).flatMap((a) => [a.pai_id, a.mae_id]),
+  );
 
   const externos: Externo[] = (externosRaw ?? []).map((a) => ({
     id: a.id,
@@ -162,13 +167,9 @@ export default async function ExternosPage({
     registro_definitivo: a.registro_definitivo,
     observacoes: a.observacoes,
     pai_id: a.pai_id,
-    pai_identificacao: identificacao(
-      primeiro(a.pai as { nome: string | null; brinco: string | null; tatuagem: string | null } | { nome: string | null; brinco: string | null; tatuagem: string | null }[] | null),
-    ),
+    pai_identificacao: identificacao(a.pai_id ? (refs.get(a.pai_id) ?? null) : null),
     mae_id: a.mae_id,
-    mae_identificacao: identificacao(
-      primeiro(a.mae as { nome: string | null; brinco: string | null; tatuagem: string | null } | { nome: string | null; brinco: string | null; tatuagem: string | null }[] | null),
-    ),
+    mae_identificacao: identificacao(a.mae_id ? (refs.get(a.mae_id) ?? null) : null),
   }));
 
   return (

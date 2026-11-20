@@ -1,3 +1,4 @@
+import { buscarRefsAnimais } from "@/lib/identificacao-parentes";
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { CandidatoGenealogia } from "../reproducao/externos/page";
@@ -98,16 +99,12 @@ async function paginar(consulta: (de: number, ate: number) => PromiseLike<{ data
 }
 
 async function buscarNascidos(supabase: ClienteServidor, localId: string): Promise<Nascido[]> {
-  type Ref = { nome: string | null; brinco: string | null; tatuagem: string | null };
   const linhas = await paginar((de, ate) =>
     supabase
       .from("animais")
       .select(
         `id, nome, brinco, tatuagem, especie, sexo, data_nascimento, criado_em, situacao, area_id, peso_nascimento,
-         areas(nome), categorias!categoria_id(descricao), racas(descricao),
-         mae:animais!mae_id(nome, brinco, tatuagem),
-         pai:animais!pai_id(nome, brinco, tatuagem),
-         receptora:animais!receptora_id(nome, brinco, tatuagem)`,
+         mae_id, pai_id, receptora_id, areas(nome), categorias!categoria_id(descricao), racas(descricao)`,
       )
       .eq("local_id", localId)
       .eq("origem_registro", "proprio")
@@ -115,6 +112,12 @@ async function buscarNascidos(supabase: ClienteServidor, localId: string): Promi
       .order("criado_em", { ascending: false })
       .range(de, ate),
   );
+
+  const refs = await buscarRefsAnimais(
+    supabase,
+    linhas.flatMap((a) => [a.mae_id as string | null, a.pai_id as string | null, a.receptora_id as string | null]),
+  );
+  const ref = (id: unknown) => (id ? (refs.get(id as string) ?? null) : null);
 
   return linhas.map((a) => ({
     id: a.id as string,
@@ -132,9 +135,9 @@ async function buscarNascidos(supabase: ClienteServidor, localId: string): Promi
       primeiro(a.categorias as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
     raca_descricao: primeiro(a.racas as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
     peso_nascimento: a.peso_nascimento == null ? null : Number(a.peso_nascimento),
-    mae: identificacao(primeiro(a.mae as Ref | Ref[] | null)),
-    pai: identificacao(primeiro(a.pai as Ref | Ref[] | null)),
-    receptora: identificacao(primeiro(a.receptora as Ref | Ref[] | null)),
+    mae: identificacao(ref(a.mae_id)),
+    pai: identificacao(ref(a.pai_id)),
+    receptora: identificacao(ref(a.receptora_id)),
   }));
 }
 
