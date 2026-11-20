@@ -18,6 +18,7 @@ import { FiltroMultiSelecao } from "@/components/filtro-multi-selecao";
 import { cn } from "@/lib/utils";
 import { apagarAnimal } from "@/lib/actions/animais";
 import { DialogoAnimal } from "./dialogo-animal";
+import type { OpcaoPelagem } from "@/components/campo-pelagem";
 import { DialogoAnimalLote } from "./dialogo-animal-lote";
 import type { Animal, CategoriaIvz, Especie, OpcaoArea, OpcaoCategoria, OpcaoRaca } from "./page";
 
@@ -75,6 +76,8 @@ type Props = {
   areas: OpcaoArea[];
   categorias: OpcaoCategoria[];
   racas: OpcaoRaca[];
+  pelagens: OpcaoPelagem[];
+  localNome: string;
   categoriasIvz: CategoriaIvz[];
   cicloAtivoNome: string | null;
   podeEditar: boolean;
@@ -89,6 +92,8 @@ export function TabelaAnimais({
   areas,
   categorias,
   racas,
+  pelagens,
+  localNome,
   categoriasIvz,
   cicloAtivoNome,
   podeEditar,
@@ -335,6 +340,8 @@ export function TabelaAnimais({
           areas={areas}
           categorias={categorias}
           racas={racas}
+          pelagens={pelagens}
+          localNome={localNome}
           categoriasIvz={categoriasIvz}
           temCicloAtivo={!!cicloAtivoNome}
           onFechar={() => setSelecionadoId(null)}

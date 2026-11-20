@@ -58,6 +58,7 @@ export async function salvarAnimalExterno(
     observacoes: (formData.get("observacoes") as string)?.trim() || null,
     pai_id: (formData.get("paiId") as string) || null,
     mae_id: (formData.get("maeId") as string) || null,
+    ...(formData.has("pelagemId") ? { pelagem_id: (formData.get("pelagemId") as string) || null } : {}),
   };
 
   const supabase = await criarClienteServidor();

@@ -21,6 +21,8 @@ import { criarAnimal, atualizarAnimal } from "@/lib/actions/animais";
 import { CampoArea } from "./campo-area";
 import { CampoCategoria } from "./campo-categoria";
 import { CampoRaca } from "./campo-raca";
+import { CampoPelagem, type OpcaoPelagem } from "@/components/campo-pelagem";
+import { BotaoGenealogia } from "@/components/genealogia";
 import { SeletorAnimalDialog, identificacaoCompleta } from "./seletor-animal-dialog";
 import type { Animal, CategoriaIvz, Especie, OpcaoArea, OpcaoCategoria, OpcaoRaca } from "./page";
 
@@ -52,6 +54,8 @@ type Props = {
   areas: OpcaoArea[];
   categorias: OpcaoCategoria[];
   racas: OpcaoRaca[];
+  pelagens: OpcaoPelagem[];
+  localNome: string;
   categoriasIvz: CategoriaIvz[];
   temCicloAtivo: boolean;
   onFechar: () => void;
@@ -64,6 +68,8 @@ export function DialogoAnimal({
   areas,
   categorias,
   racas,
+  pelagens,
+  localNome,
   categoriasIvz,
   temCicloAtivo,
   onFechar,
@@ -84,6 +90,8 @@ export function DialogoAnimal({
   const [categoriaId, setCategoriaId] = useState(existente?.categoria_id ?? "");
   const [racasLocais, setRacasLocais] = useState(racas);
   const [racaId, setRacaId] = useState(existente?.raca_id ?? racas.find((r) => r.padrao)?.id ?? "");
+  const [pelagensLocais, setPelagensLocais] = useState(pelagens);
+  const [pelagemId, setPelagemId] = useState(existente?.pelagem_id ?? "");
   const [grauSangue, setGrauSangue] = useState(existente?.grau_sangue ?? "Desconhecido");
   const [dataNascimento, setDataNascimento] = useState(existente?.data_nascimento ?? "");
   const [nome, setNome] = useState(existente?.nome ?? "");
@@ -99,13 +107,13 @@ export function DialogoAnimal({
   const maeInicial = existente?.mae_id ? animais.find((a) => a.id === existente.mae_id) : null;
   const receptoraInicial = existente?.receptora_id ? animais.find((a) => a.id === existente.receptora_id) : null;
   const [paiId, setPaiId] = useState(existente?.pai_id ?? "");
-  const [paiResumo, setPaiResumo] = useState(paiInicial ? identificacaoCompleta(paiInicial) : "");
+  const [paiResumo, setPaiResumo] = useState(paiInicial ? identificacaoCompleta(paiInicial) : (existente?.pai_identificacao ?? ""));
   const [maeId, setMaeId] = useState(existente?.mae_id ?? "");
-  const [maeResumo, setMaeResumo] = useState(maeInicial ? identificacaoCompleta(maeInicial) : "");
+  const [maeResumo, setMaeResumo] = useState(maeInicial ? identificacaoCompleta(maeInicial) : (existente?.mae_identificacao ?? ""));
   const [veioDeTE, setVeioDeTE] = useState(!!existente?.receptora_id);
   const [receptoraId, setReceptoraId] = useState(existente?.receptora_id ?? "");
   const [receptoraResumo, setReceptoraResumo] = useState(
-    receptoraInicial ? identificacaoCompleta(receptoraInicial) : "",
+    receptoraInicial ? identificacaoCompleta(receptoraInicial) : (existente?.receptora_identificacao ?? ""),
   );
   const [seletorAberto, setSeletorAberto] = useState<"pai" | "mae" | "receptora" | null>(null);
 
@@ -157,8 +165,11 @@ export function DialogoAnimal({
     <>
       <Dialog open={animal !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
+          <DialogHeader className="flex-row items-center justify-between gap-2 pr-8">
             <DialogTitle>{existente ? "Editar animal" : "Novo animal"}</DialogTitle>
+            {existente && (existente.pai_id || existente.mae_id) && (
+              <BotaoGenealogia animalId={existente.id} localNome={localNome} />
+            )}
           </DialogHeader>
           {animal && (
             <form ref={formRef} action={acao} className="flex flex-col gap-4">
@@ -285,6 +296,17 @@ export function DialogoAnimal({
                   onCriada={(raca) => setRacasLocais((atual) => [...atual, raca])}
                 />
               </div>
+
+              {especieFiltro === "equino" && (
+                <CampoPelagem
+                  htmlId="pelagemAnimal"
+                  value={pelagemId}
+                  onValueChange={setPelagemId}
+                  pelagens={pelagensLocais}
+                  localId={localId}
+                  onCriada={(p) => setPelagensLocais((atual) => [...atual, p])}
+                />
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <CampoParente

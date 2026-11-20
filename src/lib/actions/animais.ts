@@ -68,6 +68,8 @@ export async function criarAnimal(
     pai_id: (formData.get("paiId") as string) || null,
     mae_id: (formData.get("maeId") as string) || null,
     receptora_id: (formData.get("receptoraId") as string) || null,
+    // Pelagem só vem no form de equino; sem o campo, não mexe.
+    ...(formData.has("pelagemId") ? { pelagem_id: (formData.get("pelagemId") as string) || null } : {}),
     castrado: categoria.sexo === "macho" && formData.get("castrado") === "on",
     // Só cadastro direto soma no estoque inicial do ciclo — nascimento e
     // compra (rotinas futuras) nunca representam uma categoria nele.
@@ -176,6 +178,8 @@ export async function atualizarAnimal(
     pai_id: (formData.get("paiId") as string) || null,
     mae_id: (formData.get("maeId") as string) || null,
     receptora_id: (formData.get("receptoraId") as string) || null,
+    // Pelagem só vem no form de equino; sem o campo, não mexe.
+    ...(formData.has("pelagemId") ? { pelagem_id: (formData.get("pelagemId") as string) || null } : {}),
     castrado: categoria.sexo === "macho" && formData.get("castrado") === "on",
     valor: valorTexto ? Number(valorTexto) : null,
   };

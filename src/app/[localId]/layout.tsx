@@ -81,6 +81,7 @@ const navegacaoAjustes = [
   { rotulo: "Local e Membros", href: "/local" },
   { rotulo: "Ciclos", href: "/ciclos" },
   { rotulo: "Raças", href: "/racas" },
+  { rotulo: "Pelagens", href: "/pelagens" },
   { rotulo: "Medicamentos", href: "/medicamentos" },
 ];
 

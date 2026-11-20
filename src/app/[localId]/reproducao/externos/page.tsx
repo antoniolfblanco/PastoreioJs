@@ -2,6 +2,7 @@ import { buscarRefsAnimais } from "@/lib/identificacao-parentes";
 import { buscarLocalAtual, ehGerente } from "@/lib/local";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ListaExternos } from "./lista-externos";
+import type { OpcaoPelagem } from "@/components/campo-pelagem";
 
 export type Especie = "bovino" | "ovino" | "equino";
 export type Sexo = "macho" | "femea" | "desconhecido";
@@ -26,6 +27,7 @@ export type Externo = {
   pai_identificacao: string | null;
   mae_id: string | null;
   mae_identificacao: string | null;
+  pelagem_id: string | null;
 };
 
 export type OpcaoCategoria = { id: string; descricao: string; especie: Especie; sexo: Sexo };
@@ -125,7 +127,7 @@ export default async function ExternosPage({
       .from("animais")
       .select(
         `id, nome, brinco, tatuagem, data_nascimento, sexo, especie, categoria_id, raca_id,
-         grau_sangue, registro_provisorio, registro_definitivo, observacoes, pai_id, mae_id,
+         grau_sangue, registro_provisorio, registro_definitivo, observacoes, pai_id, mae_id, pelagem_id,
          categorias!categoria_id(descricao), racas(descricao)`,
       )
       .eq("local_id", localId)
@@ -136,6 +138,12 @@ export default async function ExternosPage({
     supabase.from("categorias_ivz").select("id, nome, especie, sexo").eq("ativo", true).order("ordem"),
     buscarCandidatos(supabase, localId),
   ]);
+  const { data: pelagens } = await supabase
+    .from("pelagens")
+    .select("id, descricao")
+    .eq("local_id", localId)
+    .eq("ativo", true)
+    .order("descricao");
 
   if (erroExternos || erroCategorias || erroRacas || erroCategoriasIvz) {
     throw new Error(
@@ -170,6 +178,7 @@ export default async function ExternosPage({
     pai_identificacao: identificacao(a.pai_id ? (refs.get(a.pai_id) ?? null) : null),
     mae_id: a.mae_id,
     mae_identificacao: identificacao(a.mae_id ? (refs.get(a.mae_id) ?? null) : null),
+    pelagem_id: a.pelagem_id,
   }));
 
   return (
@@ -181,6 +190,8 @@ export default async function ExternosPage({
         racas={(racas as OpcaoRaca[]) ?? []}
         categoriasIvz={(categoriasIvz as CategoriaIvz[]) ?? []}
         candidatos={candidatos}
+        pelagens={(pelagens as OpcaoPelagem[]) ?? []}
+        localNome={local.nome}
         podeEditar={ehGerente(local.perfil)}
       />
     </div>

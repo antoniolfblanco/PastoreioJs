@@ -18,6 +18,8 @@ import { salvarAnimalExterno } from "@/lib/actions/externos";
 import { CampoCategoria } from "../../animais/campo-categoria";
 import { CampoRaca } from "../../animais/campo-raca";
 import { SeletorAnimalParente } from "./seletor-animal-parente";
+import { CampoPelagem, type OpcaoPelagem } from "@/components/campo-pelagem";
+import { BotaoGenealogia } from "@/components/genealogia";
 import type { CandidatoGenealogia, CategoriaIvz, Especie, Externo, OpcaoCategoria, OpcaoRaca } from "./page";
 
 const rotulosEspecie: Record<Especie, string> = { bovino: "Bovino", ovino: "Ovino", equino: "Equino" };
@@ -36,10 +38,22 @@ type Props = {
   racas: OpcaoRaca[];
   categoriasIvz: CategoriaIvz[];
   candidatos: CandidatoGenealogia[];
+  pelagens: OpcaoPelagem[];
+  localNome: string;
   onFechar: () => void;
 };
 
-export function DialogoExterno({ localId, externo, categorias, racas, categoriasIvz, candidatos, onFechar }: Props) {
+export function DialogoExterno({
+  localId,
+  externo,
+  categorias,
+  racas,
+  categoriasIvz,
+  candidatos,
+  pelagens,
+  localNome,
+  onFechar,
+}: Props) {
   const [resultado, acao, emAndamento] = useActionState(salvarAnimalExterno, undefined);
   const existente = externo && externo !== "novo" ? externo : null;
 
@@ -48,6 +62,8 @@ export function DialogoExterno({ localId, externo, categorias, racas, categorias
   const [categoriaId, setCategoriaId] = useState(existente?.categoria_id ?? "");
   const [racasLocais, setRacasLocais] = useState(racas);
   const [racaId, setRacaId] = useState(existente?.raca_id ?? racas.find((r) => r.padrao)?.id ?? "");
+  const [pelagensLocais, setPelagensLocais] = useState(pelagens);
+  const [pelagemId, setPelagemId] = useState(existente?.pelagem_id ?? "");
   const [grauSangue, setGrauSangue] = useState(existente?.grau_sangue ?? "Desconhecido");
   const [dataNascimento, setDataNascimento] = useState(existente?.data_nascimento ?? "");
   const [nome, setNome] = useState(existente?.nome ?? "");
@@ -79,8 +95,11 @@ export function DialogoExterno({ localId, externo, categorias, racas, categorias
     <>
       <Dialog open={externo !== null} onOpenChange={(aberto) => !aberto && onFechar()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
+          <DialogHeader className="flex-row items-center justify-between gap-2 pr-8">
             <DialogTitle>{existente ? "Editar animal externo" : "Novo animal externo"}</DialogTitle>
+            {existente && (existente.pai_id || existente.mae_id) && (
+              <BotaoGenealogia animalId={existente.id} localNome={localNome} />
+            )}
           </DialogHeader>
           {externo && (
             <form key={existente?.id ?? "novo"} action={acao} className="flex flex-col gap-4">
@@ -177,6 +196,17 @@ export function DialogoExterno({ localId, externo, categorias, racas, categorias
                   onCriada={(raca) => setRacasLocais((atual) => [...atual, raca])}
                 />
               </div>
+
+              {especieFiltro === "equino" && (
+                <CampoPelagem
+                  htmlId="pelagemExterno"
+                  value={pelagemId}
+                  onValueChange={setPelagemId}
+                  pelagens={pelagensLocais}
+                  localId={localId}
+                  onCriada={(p) => setPelagensLocais((atual) => [...atual, p])}
+                />
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <CampoParente

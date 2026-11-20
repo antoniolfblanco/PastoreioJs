@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { apagarAnimalExterno } from "@/lib/actions/externos";
 import { DialogoExterno } from "./dialogo-externo";
+import type { OpcaoPelagem } from "@/components/campo-pelagem";
 import type { CandidatoGenealogia, CategoriaIvz, Especie, Externo, OpcaoCategoria, OpcaoRaca } from "./page";
 
 const especies: { value: Especie; rotulo: string }[] = [
@@ -61,10 +62,22 @@ type Props = {
   racas: OpcaoRaca[];
   categoriasIvz: CategoriaIvz[];
   candidatos: CandidatoGenealogia[];
+  pelagens: OpcaoPelagem[];
+  localNome: string;
   podeEditar: boolean;
 };
 
-export function ListaExternos({ localId, externos, categorias, racas, categoriasIvz, candidatos, podeEditar }: Props) {
+export function ListaExternos({
+  localId,
+  externos,
+  categorias,
+  racas,
+  categoriasIvz,
+  candidatos,
+  pelagens,
+  localNome,
+  podeEditar,
+}: Props) {
   const [especieSelecionada, setEspecieSelecionada] = useState<Especie>("bovino");
   const [busca, setBusca] = useState("");
   const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaId; desc: boolean }>({
@@ -243,6 +256,8 @@ export function ListaExternos({ localId, externos, categorias, racas, categorias
           racas={racas}
           categoriasIvz={categoriasIvz}
           candidatos={candidatos}
+          pelagens={pelagens}
+          localNome={localNome}
           onFechar={() => setSelecionadoId(null)}
         />
       )}

@@ -1,4 +1,6 @@
 import { buscarLocalAtual, podeGerenciarConteudo } from "@/lib/local";
+import { buscarRefsAnimais } from "@/lib/identificacao-parentes";
+import type { OpcaoPelagem } from "@/components/campo-pelagem";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { TabelaAnimais } from "./tabela-animais";
 
@@ -23,6 +25,11 @@ export type Animal = {
   pai_id: string | null;
   mae_id: string | null;
   receptora_id: string | null;
+  pelagem_id: string | null;
+  // Identificação de pai/mãe/receptora (podem ser externos ou já ter saído).
+  pai_identificacao: string | null;
+  mae_identificacao: string | null;
+  receptora_identificacao: string | null;
   castrado: boolean;
   valor: number | null;
   area_nome: string;
@@ -41,7 +48,7 @@ function primeiro<T>(valor: T | T[] | null): T | null {
 
 const SELECAO_ANIMAL = `id, nome, brinco, tatuagem, data_nascimento, sexo, especie, area_id, categoria_id, raca_id,
   grau_sangue, registro_provisorio, registro_definitivo, observacoes, pai_id, mae_id, receptora_id,
-  castrado, valor,
+  castrado, valor, pelagem_id,
   areas(nome), categorias!categoria_id(descricao), racas(descricao)`;
 // `categorias!categoria_id` desambigua o embed: `animais` tem DUAS FKs pra
 // `categorias` (a categoria atual e `categoria_estoque_inicial_id`, usada só
@@ -97,6 +104,7 @@ export default async function AnimaisPage({
     { data: racas, error: erroRacas },
     { data: categoriasIvz, error: erroCategoriasIvz },
     { data: ciclo },
+    { data: pelagens },
   ] = await Promise.all([
     buscarTodosAnimais(supabase, localId),
     supabase.from("areas").select("id, nome").eq("local_id", localId).eq("ativo", true).order("ordem"),
@@ -109,6 +117,7 @@ export default async function AnimaisPage({
     supabase.from("racas").select("id, descricao, padrao").eq("local_id", localId).eq("ativo", true).order("descricao"),
     supabase.from("categorias_ivz").select("id, nome, especie, sexo").eq("ativo", true).order("ordem"),
     supabase.from("ciclos").select("id, nome").eq("local_id", localId).eq("ativo", true).maybeSingle(),
+    supabase.from("pelagens").select("id, descricao").eq("local_id", localId).eq("ativo", true).order("descricao"),
   ]);
 
   if (erroAreas || erroCategorias || erroRacas || erroCategoriasIvz) {
@@ -118,8 +127,20 @@ export default async function AnimaisPage({
     );
   }
 
+  const refs = await buscarRefsAnimais(
+    supabase,
+    animaisRaw.flatMap((a) => [a.pai_id as string | null, a.mae_id as string | null, a.receptora_id as string | null]),
+  );
+  const identificacaoRef = (id: unknown) => {
+    const r = id ? refs.get(id as string) : null;
+    return r ? [r.brinco, r.tatuagem, r.nome].filter(Boolean).join(" • ") || "Sem identificação" : null;
+  };
+
   const animais = animaisRaw.map((a) => ({
     ...a,
+    pai_identificacao: identificacaoRef(a.pai_id),
+    mae_identificacao: identificacaoRef(a.mae_id),
+    receptora_identificacao: identificacaoRef(a.receptora_id),
     area_nome: primeiro(a.areas as { nome: string } | { nome: string }[] | null)?.nome ?? "—",
     categoria_descricao:
       primeiro(a.categorias as { descricao: string } | { descricao: string }[] | null)?.descricao ?? "—",
@@ -134,6 +155,8 @@ export default async function AnimaisPage({
         areas={(areas as OpcaoArea[]) ?? []}
         categorias={(categorias as OpcaoCategoria[]) ?? []}
         racas={(racas as OpcaoRaca[]) ?? []}
+        pelagens={(pelagens as OpcaoPelagem[]) ?? []}
+        localNome={local.nome}
         categoriasIvz={(categoriasIvz as CategoriaIvz[]) ?? []}
         cicloAtivoNome={ciclo?.nome ?? null}
         podeEditar={podeGerenciarConteudo(local.perfil)}
